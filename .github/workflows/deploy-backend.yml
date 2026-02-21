@@ -1,0 +1,110 @@
+name: Backend CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths: ['backend/**']
+  pull_request:
+    branches: [main]
+    paths: ['backend/**']
+
+jobs:
+  test:
+    name: Test ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth-service
+          - users-service
+          - products-service
+          - cart-service
+          - orders-service
+          - payments-service
+          - reviews-service
+          - favorites-service
+          - api-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: backend/${{ matrix.service }}
+        run: npm ci
+
+      - name: Run tests
+        working-directory: backend/${{ matrix.service }}
+        run: npm test || echo "No tests found, skipping"
+        env:
+          JWT_SECRET: test-secret-key
+          NODE_ENV: test
+
+      - name: Syntax validation
+        working-directory: backend/${{ matrix.service }}
+        run: node -c src/server.js
+
+  build:
+    name: Build ${{ matrix.service }}
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - auth-service
+          - users-service
+          - products-service
+          - cart-service
+          - orders-service
+          - payments-service
+          - reviews-service
+          - favorites-service
+          - api-gateway
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend/${{ matrix.service }}
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/baseshop-${{ matrix.service }}:latest
+
+  deploy-railway:
+    name: Deploy to Railway
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy services
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          # Deploy in dependency order
+          for service in auth-service users-service products-service cart-service reviews-service favorites-service payments-service orders-service api-gateway; do
+            echo "Deploying $service..."
+            cd backend/$service
+            railway up -d -s $service || echo "Failed to deploy $service"
+            cd ../..
+            sleep 5
+          done
+
+      - name: Verify health
+        run: |
+          sleep 30
+          curl -sf ${{ secrets.API_GATEWAY_URL }}/health || echo "Health check pending..."

@@ -1,0 +1,396 @@
+const express = require('express');
+const { body, param, query, validationResult } = require('express-validator');
+const { v4: uuidv4 } = require('uuid');
+const { getDb, generateOrderNumber } = require('../database');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+const router = express.Router();
+
+// ── Helpers ──
+
+function handleValidation(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg });
+  }
+  return null;
+}
+
+// Transiciones de estado válidas
+const VALID_TRANSITIONS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['processing', 'cancelled'],
+  processing: ['shipped', 'cancelled'],
+  shipped: ['delivered'],
+  delivered: ['refunded'],
+  cancelled: [],
+  refunded: [],
+};
+
+const VALID_STATUSES = Object.keys(VALID_TRANSITIONS);
+
+// Todas las rutas requieren autenticación
+router.use(authMiddleware);
+
+// ══════════════════════════════════════════════
+//  CLIENT ROUTES (authenticated users)
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// POST /api/orders — Crear pedido
+// ──────────────────────────────────────────────
+router.post('/', [
+  body('items')
+    .isArray({ min: 1 }).withMessage('Debe incluir al menos un producto'),
+  body('items.*.product_id')
+    .notEmpty().withMessage('El ID del producto es requerido'),
+  body('items.*.product_name')
+    .notEmpty().withMessage('El nombre del producto es requerido'),
+  body('items.*.product_price')
+    .isFloat({ min: 0 }).withMessage('El precio debe ser un número positivo'),
+  body('items.*.quantity')
+    .optional().isInt({ min: 1 }).withMessage('La cantidad debe ser al menos 1'),
+  body('shipping_address')
+    .notEmpty().withMessage('La dirección de envío es requerida'),
+  body('billing_address')
+    .optional(),
+  body('payment_method')
+    .optional().isString(),
+  body('notes')
+    .optional().isString(),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const { items, shipping_address, billing_address, payment_method, notes } = req.body;
+
+    // Calcular totales
+    let subtotal = 0;
+    const processedItems = items.map(item => {
+      const qty = item.quantity || 1;
+      const itemSubtotal = (item.product_price || 0) * qty;
+      subtotal += itemSubtotal;
+      return { ...item, quantity: qty, subtotal: Math.round(itemSubtotal * 100) / 100 };
+    });
+
+    subtotal = Math.round(subtotal * 100) / 100;
+    const shippingCost = 0; // puede configurarse después
+    const tax = Math.round(subtotal * 0.19 * 100) / 100;
+    const total = Math.round((subtotal + shippingCost + tax) * 100) / 100;
+
+    // Generar order_number e ID
+    const orderId = uuidv4();
+    const orderNumber = generateOrderNumber();
+
+    // Serializar direcciones como JSON
+    const shippingAddrStr = typeof shipping_address === 'object' ? JSON.stringify(shipping_address) : (shipping_address || '');
+    const billingAddrStr = typeof billing_address === 'object' ? JSON.stringify(billing_address) : (billing_address || '');
+
+    // Insertar pedido
+    db.prepare(
+      `INSERT INTO orders (id, order_number, user_id, status, subtotal, shipping_cost, tax, total, shipping_address, billing_address, payment_method, payment_id, notes)
+       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, '', ?)`
+    ).run(orderId, orderNumber, userId, subtotal, shippingCost, tax, total, shippingAddrStr, billingAddrStr, payment_method || '', notes || '');
+
+    // Insertar items del pedido
+    for (const item of processedItems) {
+      const itemId = uuidv4();
+      db.prepare(
+        `INSERT INTO order_items (id, order_id, product_id, product_name, product_price, product_image, quantity, subtotal)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(itemId, orderId, item.product_id, item.product_name, item.product_price, item.product_image || '', item.quantity, item.subtotal);
+    }
+
+    // Registrar estado inicial en historial
+    db.prepare(
+      `INSERT INTO order_status_history (id, order_id, status, note, changed_by)
+       VALUES (?, ?, 'pending', 'Pedido creado', ?)`
+    ).run(uuidv4(), orderId, userId);
+
+    // Obtener pedido completo
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
+    const orderItems = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY created_at').all(orderId);
+
+    res.status(201).json({
+      message: 'Pedido creado exitosamente',
+      data: { ...order, items: orderItems },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error creating order:', error);
+    res.status(500).json({ error: 'Error al crear el pedido' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/orders/me — Listar mis pedidos
+// ──────────────────────────────────────────────
+router.get('/me', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+    const status = req.query.status;
+
+    let countSql = 'SELECT COUNT(*) as total FROM orders WHERE user_id = ?';
+    let dataSql = 'SELECT * FROM orders WHERE user_id = ?';
+    const params = [userId];
+
+    if (status && VALID_STATUSES.includes(status)) {
+      countSql += ' AND status = ?';
+      dataSql += ' AND status = ?';
+      params.push(status);
+    }
+
+    dataSql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+
+    const countResult = db.prepare(countSql).get(...params);
+    const total = countResult ? countResult.total : 0;
+    const orders = db.prepare(dataSql).all(...params, limit, offset);
+
+    res.json({
+      data: orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error listing my orders:', error);
+    res.status(500).json({ error: 'Error al listar los pedidos' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/orders/me/:id — Detalle de mi pedido
+// ──────────────────────────────────────────────
+router.get('/me/:id', [
+  param('id').notEmpty().withMessage('El ID del pedido es requerido'),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const { id } = req.params;
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(id, userId);
+
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY created_at').all(id);
+    const statusHistory = db.prepare('SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at').all(id);
+
+    res.json({
+      data: { ...order, items, status_history: statusHistory },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error getting order detail:', error);
+    res.status(500).json({ error: 'Error al obtener el detalle del pedido' });
+  }
+});
+
+// ══════════════════════════════════════════════
+//  ADMIN ROUTES
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// GET /api/orders/stats/summary — Estadísticas
+// ──────────────────────────────────────────────
+router.get('/stats/summary', roleMiddleware('admin'), (req, res) => {
+  try {
+    const db = getDb();
+
+    // Total de pedidos
+    const totalOrders = db.prepare('SELECT COUNT(*) as count FROM orders').get();
+
+    // Pedidos por estado
+    const byStatus = db.prepare(
+      'SELECT status, COUNT(*) as count FROM orders GROUP BY status'
+    ).all();
+
+    // Revenue: hoy
+    const revenueToday = db.prepare(
+      "SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as count FROM orders WHERE date(created_at) = date('now') AND status != 'cancelled'"
+    ).get();
+
+    // Revenue: esta semana (últimos 7 días)
+    const revenueWeek = db.prepare(
+      "SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as count FROM orders WHERE created_at >= datetime('now', '-7 days') AND status != 'cancelled'"
+    ).get();
+
+    // Revenue: este mes (últimos 30 días)
+    const revenueMonth = db.prepare(
+      "SELECT COALESCE(SUM(total), 0) as revenue, COUNT(*) as count FROM orders WHERE created_at >= datetime('now', '-30 days') AND status != 'cancelled'"
+    ).get();
+
+    const statusMap = {};
+    for (const s of byStatus) {
+      statusMap[s.status] = s.count;
+    }
+
+    res.json({
+      data: {
+        totalOrders: totalOrders ? totalOrders.count : 0,
+        byStatus: statusMap,
+        revenue: {
+          today: { amount: revenueToday ? revenueToday.revenue : 0, orders: revenueToday ? revenueToday.count : 0 },
+          week: { amount: revenueWeek ? revenueWeek.revenue : 0, orders: revenueWeek ? revenueWeek.count : 0 },
+          month: { amount: revenueMonth ? revenueMonth.revenue : 0, orders: revenueMonth ? revenueMonth.count : 0 },
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error getting stats:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/orders — Listar TODOS los pedidos (admin)
+// ──────────────────────────────────────────────
+router.get('/', roleMiddleware('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+    const status = req.query.status;
+    const search = req.query.search;
+
+    let countSql = 'SELECT COUNT(*) as total FROM orders WHERE 1=1';
+    let dataSql = 'SELECT * FROM orders WHERE 1=1';
+    const params = [];
+
+    if (status && VALID_STATUSES.includes(status)) {
+      countSql += ' AND status = ?';
+      dataSql += ' AND status = ?';
+      params.push(status);
+    }
+
+    if (search) {
+      countSql += ' AND order_number LIKE ?';
+      dataSql += ' AND order_number LIKE ?';
+      params.push(`%${search}%`);
+    }
+
+    dataSql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+
+    const countResult = db.prepare(countSql).get(...params);
+    const total = countResult ? countResult.total : 0;
+    const orders = db.prepare(dataSql).all(...params, limit, offset);
+
+    res.json({
+      data: orders,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error listing all orders:', error);
+    res.status(500).json({ error: 'Error al listar los pedidos' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/orders/:id — Detalle de cualquier pedido (admin)
+// ──────────────────────────────────────────────
+router.get('/:id', roleMiddleware('admin'), [
+  param('id').notEmpty().withMessage('El ID del pedido es requerido'),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const { id } = req.params;
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    const items = db.prepare('SELECT * FROM order_items WHERE order_id = ? ORDER BY created_at').all(id);
+    const statusHistory = db.prepare('SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at').all(id);
+
+    res.json({
+      data: { ...order, items, status_history: statusHistory },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error getting order detail:', error);
+    res.status(500).json({ error: 'Error al obtener el detalle del pedido' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// PATCH /api/orders/:id/status — Actualizar estado (admin)
+// ──────────────────────────────────────────────
+router.patch('/:id/status', roleMiddleware('admin'), [
+  param('id').notEmpty().withMessage('El ID del pedido es requerido'),
+  body('status')
+    .notEmpty().withMessage('El estado es requerido')
+    .isIn(VALID_STATUSES).withMessage(`Estado inválido. Valores permitidos: ${VALID_STATUSES.join(', ')}`),
+  body('note')
+    .optional().isString(),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const { id } = req.params;
+    const { status: newStatus, note } = req.body;
+    const changedBy = req.user.id || req.user.userId;
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    // Validar transición de estado
+    const allowedTransitions = VALID_TRANSITIONS[order.status] || [];
+    if (!allowedTransitions.includes(newStatus)) {
+      return res.status(400).json({
+        error: `Transición de estado no permitida: ${order.status} → ${newStatus}. Transiciones válidas: ${allowedTransitions.join(', ') || 'ninguna'}`,
+      });
+    }
+
+    // Actualizar estado del pedido
+    db.prepare(
+      "UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(newStatus, id);
+
+    // Registrar en historial
+    db.prepare(
+      `INSERT INTO order_status_history (id, order_id, status, note, changed_by)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(uuidv4(), id, newStatus, note || '', changedBy);
+
+    const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    const statusHistory = db.prepare('SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at').all(id);
+
+    res.json({
+      message: `Estado actualizado a '${newStatus}'`,
+      data: { ...updatedOrder, status_history: statusHistory },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error updating order status:', error);
+    res.status(500).json({ error: 'Error al actualizar el estado del pedido' });
+  }
+});
+
+module.exports = router;

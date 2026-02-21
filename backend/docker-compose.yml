@@ -1,0 +1,138 @@
+services:
+  api-gateway:
+    build: { context: ./api-gateway, dockerfile: Dockerfile }
+    ports: ["3000:3000"]
+    environment:
+      - PORT=3000
+      - AUTH_SERVICE_URL=http://auth-service:3001
+      - USERS_SERVICE_URL=http://users-service:3002
+      - PRODUCTS_SERVICE_URL=http://products-service:3003
+      - CART_SERVICE_URL=http://cart-service:3004
+      - ORDERS_SERVICE_URL=http://orders-service:3005
+      - PAYMENTS_SERVICE_URL=http://payments-service:3006
+      - REVIEWS_SERVICE_URL=http://reviews-service:3007
+      - FAVORITES_SERVICE_URL=http://favorites-service:3008
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - ALLOWED_ORIGINS=http://localhost:9090,http://localhost:8080,http://localhost:3000
+    depends_on:
+      auth-service: { condition: service_healthy }
+      users-service: { condition: service_healthy }
+      products-service: { condition: service_healthy }
+      cart-service: { condition: service_healthy }
+      orders-service: { condition: service_healthy }
+      payments-service: { condition: service_healthy }
+      reviews-service: { condition: service_healthy }
+      favorites-service: { condition: service_healthy }
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  auth-service:
+    build: { context: ./auth-service, dockerfile: Dockerfile }
+    ports: ["3001:3001"]
+    environment:
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - JWT_EXPIRATION=24h
+      - DB_PATH=/app/data/auth.db
+      - ADMIN_EMAIL=admin@baseshop.com
+      - ADMIN_PASSWORD=Admin123!
+      - ALLOWED_ORIGINS=http://localhost:9090,http://localhost:8080,http://localhost:3000
+    volumes: [auth-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  users-service:
+    build: { context: ./users-service, dockerfile: Dockerfile }
+    ports: ["3002:3002"]
+    environment:
+      - PORT=3002
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/users.db
+    volumes: [users-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  products-service:
+    build: { context: ./products-service, dockerfile: Dockerfile }
+    ports: ["3003:3003"]
+    environment:
+      - PORT=3003
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/products.db
+    volumes: [products-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  cart-service:
+    build: { context: ./cart-service, dockerfile: Dockerfile }
+    ports: ["3004:3004"]
+    environment:
+      - PORT=3004
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/cart.db
+    volumes: [cart-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  orders-service:
+    build: { context: ./orders-service, dockerfile: Dockerfile }
+    ports: ["3005:3005"]
+    environment:
+      - PORT=3005
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/orders.db
+    volumes: [orders-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  payments-service:
+    build: { context: ./payments-service, dockerfile: Dockerfile }
+    ports: ["3006:3006"]
+    environment:
+      - PORT=3006
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/payments.db
+      - PAYU_API_KEY=${PAYU_API_KEY:-}
+      - PAYU_API_LOGIN=${PAYU_API_LOGIN:-}
+      - PAYU_MERCHANT_ID=${PAYU_MERCHANT_ID:-}
+      - PAYU_ACCOUNT_ID=${PAYU_ACCOUNT_ID:-}
+      - PAYU_IS_TEST=true
+    volumes: [payments-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  reviews-service:
+    build: { context: ./reviews-service, dockerfile: Dockerfile }
+    ports: ["3007:3007"]
+    environment:
+      - PORT=3007
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/reviews.db
+    volumes: [reviews-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+  favorites-service:
+    build: { context: ./favorites-service, dockerfile: Dockerfile }
+    ports: ["3008:3008"]
+    environment:
+      - PORT=3008
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/favorites.db
+    volumes: [favorites-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
+volumes:
+  auth-data:
+  users-data:
+  products-data:
+  cart-data:
+  orders-data:
+  payments-data:
+  reviews-data:
+  favorites-data:
+
+networks:
+  baseshop-network:
+    driver: bridge

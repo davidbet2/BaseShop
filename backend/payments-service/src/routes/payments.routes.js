@@ -1,0 +1,501 @@
+const express = require('express');
+const { body, param, query, validationResult } = require('express-validator');
+const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
+const axios = require('axios');
+const { getDb } = require('../database');
+const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+const router = express.Router();
+
+// ── Helpers ──
+
+function handleValidation(req, res) {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ error: errors.array()[0].msg });
+  }
+  return null;
+}
+
+// PayU Configuration
+const PAYU_API_KEY = () => process.env.PAYU_API_KEY || '';
+const PAYU_API_LOGIN = () => process.env.PAYU_API_LOGIN || '';
+const PAYU_MERCHANT_ID = () => process.env.PAYU_MERCHANT_ID || '';
+const PAYU_ACCOUNT_ID = () => process.env.PAYU_ACCOUNT_ID || '';
+const PAYU_IS_TEST = () => (process.env.PAYU_IS_TEST || 'true') === 'true';
+
+const PAYU_API_URL = () =>
+  PAYU_IS_TEST()
+    ? 'https://sandbox.api.payulatam.com/payments-api/4.0/service.cgi'
+    : 'https://api.payulatam.com/payments-api/4.0/service.cgi';
+
+// PayU signature: MD5(apiKey~merchantId~referenceCode~amount~currency)
+function generatePayUSignature(referenceCode, amount, currency) {
+  const apiKey = PAYU_API_KEY();
+  const merchantId = PAYU_MERCHANT_ID();
+  const signatureString = `${apiKey}~${merchantId}~${referenceCode}~${amount}~${currency}`;
+  return crypto.createHash('md5').update(signatureString).digest('hex');
+}
+
+// Validate incoming PayU webhook signature
+function validatePayUWebhookSignature(apiKey, merchantId, referenceCode, amount, currency, statePol) {
+  // PayU confirmation signature: MD5(apiKey~merchantId~referenceCode~new_value~currency~state_pol)
+  // new_value = amount with one decimal if it ends in .0, otherwise full precision
+  let formattedAmount = parseFloat(amount);
+  if (formattedAmount % 1 === 0) {
+    formattedAmount = formattedAmount.toFixed(1);
+  } else {
+    formattedAmount = formattedAmount.toString();
+  }
+  const signatureString = `${apiKey}~${merchantId}~${referenceCode}~${formattedAmount}~${currency}~${statePol}`;
+  return crypto.createHash('md5').update(signatureString).digest('hex');
+}
+
+// Map PayU state_pol to internal status
+function mapPayUStatus(statePol) {
+  const statePolNum = parseInt(statePol, 10);
+  switch (statePolNum) {
+    case 4: return 'approved';
+    case 6: return 'declined';
+    case 5: return 'expired';
+    case 7: return 'pending';
+    default: return 'error';
+  }
+}
+
+const VALID_STATUSES = ['pending', 'approved', 'declined', 'expired', 'error', 'refunded'];
+
+// ══════════════════════════════════════════════
+//  WEBHOOK ROUTE (no auth — PayU callback)
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// POST /api/payments/webhook/payu — PayU confirmation
+// ──────────────────────────────────────────────
+router.post('/webhook/payu', (req, res) => {
+  try {
+    const db = getDb();
+    const {
+      merchant_id,
+      reference_sale,
+      value,
+      currency,
+      state_pol,
+      transaction_id,
+      sign,
+      payment_method_type,
+      response_message_pol,
+    } = req.body;
+
+    console.log('[payments-service] PayU webhook received:', { reference_sale, state_pol, transaction_id });
+
+    // Validate signature
+    const apiKey = PAYU_API_KEY();
+    const expectedSignature = validatePayUWebhookSignature(
+      apiKey, merchant_id, reference_sale, value, currency, state_pol
+    );
+
+    if (sign && expectedSignature !== sign) {
+      console.warn('[payments-service] Invalid PayU webhook signature');
+      // Log the attempt anyway
+      const payment = db.prepare('SELECT * FROM payments WHERE id = ? OR order_id = ?').get(reference_sale, reference_sale);
+      if (payment) {
+        db.prepare(
+          `INSERT INTO payment_logs (id, payment_id, event, data)
+           VALUES (?, ?, 'webhook_signature_invalid', ?)`
+        ).run(uuidv4(), payment.id, JSON.stringify(req.body));
+      }
+      return res.status(400).json({ error: 'Firma inválida' });
+    }
+
+    // Find payment by reference (payment id or order_id)
+    let payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(reference_sale);
+    if (!payment) {
+      payment = db.prepare('SELECT * FROM payments WHERE order_id = ?').get(reference_sale);
+    }
+
+    if (!payment) {
+      console.warn('[payments-service] Payment not found for reference:', reference_sale);
+      return res.status(404).json({ error: 'Pago no encontrado' });
+    }
+
+    // Map status
+    const newStatus = mapPayUStatus(state_pol);
+
+    // Update payment
+    db.prepare(
+      `UPDATE payments SET status = ?, provider_reference = ?, provider_response = ?, payment_method = CASE WHEN payment_method = '' THEN ? ELSE payment_method END, updated_at = datetime('now')
+       WHERE id = ?`
+    ).run(newStatus, transaction_id || '', JSON.stringify(req.body), payment_method_type ? String(payment_method_type) : '', payment.id);
+
+    // Log event
+    db.prepare(
+      `INSERT INTO payment_logs (id, payment_id, event, data)
+       VALUES (?, ?, ?, ?)`
+    ).run(uuidv4(), payment.id, `webhook_${newStatus}`, JSON.stringify({
+      state_pol,
+      transaction_id,
+      response_message: response_message_pol,
+      raw: req.body,
+    }));
+
+    console.log(`[payments-service] Payment ${payment.id} updated to ${newStatus}`);
+    res.json({ message: 'OK' });
+  } catch (error) {
+    console.error('[payments-service] Error processing PayU webhook:', error);
+    res.status(500).json({ error: 'Error al procesar webhook de PayU' });
+  }
+});
+
+// ══════════════════════════════════════════════
+//  AUTHENTICATED ROUTES
+// ══════════════════════════════════════════════
+router.use(authMiddleware);
+
+// ══════════════════════════════════════════════
+//  CLIENT ROUTES (authenticated users)
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// POST /api/payments/create — Create payment intent
+// ──────────────────────────────────────────────
+router.post('/create', [
+  body('order_id')
+    .notEmpty().withMessage('El ID de la orden es requerido'),
+  body('amount')
+    .isFloat({ min: 0.01 }).withMessage('El monto debe ser mayor a 0'),
+  body('payment_method')
+    .optional().isString().withMessage('El método de pago debe ser texto'),
+  body('buyer_email')
+    .isEmail().withMessage('El email del comprador es requerido'),
+  body('buyer_name')
+    .notEmpty().withMessage('El nombre del comprador es requerido'),
+  body('description')
+    .optional().isString(),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const { order_id, amount, payment_method, buyer_email, buyer_name, description } = req.body;
+    const currency = req.body.currency || 'COP';
+
+    // Check if a pending payment already exists for this order
+    const existingPayment = db.prepare(
+      "SELECT * FROM payments WHERE order_id = ? AND status = 'pending'"
+    ).get(order_id);
+
+    if (existingPayment) {
+      // Return existing payment data with fresh signature
+      const referenceCode = existingPayment.id;
+      const signature = generatePayUSignature(referenceCode, amount, currency);
+
+      return res.json({
+        message: 'Pago pendiente existente',
+        data: {
+          payment_id: existingPayment.id,
+          order_id: existingPayment.order_id,
+          amount: existingPayment.amount,
+          currency: existingPayment.currency,
+          status: existingPayment.status,
+          payu_form_data: {
+            merchantId: PAYU_MERCHANT_ID(),
+            accountId: PAYU_ACCOUNT_ID(),
+            referenceCode,
+            amount: existingPayment.amount,
+            currency: existingPayment.currency,
+            signature,
+            test: PAYU_IS_TEST() ? '1' : '0',
+            buyerEmail: buyer_email,
+            buyerFullName: buyer_name,
+            description: description || `Pago orden ${order_id}`,
+            apiUrl: PAYU_API_URL(),
+          },
+        },
+      });
+    }
+
+    // Create new payment
+    const paymentId = uuidv4();
+    const referenceCode = paymentId;
+    const signature = generatePayUSignature(referenceCode, amount, currency);
+
+    db.prepare(
+      `INSERT INTO payments (id, order_id, user_id, amount, currency, status, payment_method, provider, provider_reference, provider_response)
+       VALUES (?, ?, ?, ?, ?, 'pending', ?, 'payu', '', '')`
+    ).run(paymentId, order_id, userId, amount, currency, payment_method || '');
+
+    // Log creation
+    db.prepare(
+      `INSERT INTO payment_logs (id, payment_id, event, data)
+       VALUES (?, ?, 'payment_created', ?)`
+    ).run(uuidv4(), paymentId, JSON.stringify({ order_id, amount, currency, buyer_email, buyer_name }));
+
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(paymentId);
+
+    res.status(201).json({
+      message: 'Intención de pago creada exitosamente',
+      data: {
+        payment_id: payment.id,
+        order_id: payment.order_id,
+        amount: payment.amount,
+        currency: payment.currency,
+        status: payment.status,
+        created_at: payment.created_at,
+        payu_form_data: {
+          merchantId: PAYU_MERCHANT_ID(),
+          accountId: PAYU_ACCOUNT_ID(),
+          referenceCode,
+          amount,
+          currency,
+          signature,
+          test: PAYU_IS_TEST() ? '1' : '0',
+          buyerEmail: buyer_email,
+          buyerFullName: buyer_name,
+          description: description || `Pago orden ${order_id}`,
+          apiUrl: PAYU_API_URL(),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error creating payment:', error);
+    res.status(500).json({ error: 'Error al crear la intención de pago' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/payments/order/:orderId — Payment status for an order
+// ──────────────────────────────────────────────
+router.get('/order/:orderId', [
+  param('orderId').notEmpty().withMessage('El ID de la orden es requerido'),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const { orderId } = req.params;
+
+    // Users can only see their own payments, admins can see all
+    let payment;
+    if (req.user.role === 'admin') {
+      payment = db.prepare('SELECT * FROM payments WHERE order_id = ? ORDER BY created_at DESC').get(orderId);
+    } else {
+      payment = db.prepare('SELECT * FROM payments WHERE order_id = ? AND user_id = ? ORDER BY created_at DESC').get(orderId, userId);
+    }
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Pago no encontrado para esta orden' });
+    }
+
+    const logs = db.prepare('SELECT * FROM payment_logs WHERE payment_id = ? ORDER BY created_at DESC').all(payment.id);
+
+    res.json({
+      data: { ...payment, logs },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error getting payment by order:', error);
+    res.status(500).json({ error: 'Error al obtener el estado del pago' });
+  }
+});
+
+// ══════════════════════════════════════════════
+//  ADMIN ROUTES
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// GET /api/payments/stats/summary — Payment statistics
+// ──────────────────────────────────────────────
+router.get('/stats/summary', roleMiddleware('admin'), (req, res) => {
+  try {
+    const db = getDb();
+
+    // Total de pagos
+    const totalPayments = db.prepare('SELECT COUNT(*) as count FROM payments').get();
+
+    // Pagos por estado
+    const byStatus = db.prepare(
+      'SELECT status, COUNT(*) as count, COALESCE(SUM(amount), 0) as total_amount FROM payments GROUP BY status'
+    ).all();
+
+    // Revenue: hoy
+    const revenueToday = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) as revenue, COUNT(*) as count FROM payments WHERE date(created_at) = date('now') AND status = 'approved'"
+    ).get();
+
+    // Revenue: esta semana (últimos 7 días)
+    const revenueWeek = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) as revenue, COUNT(*) as count FROM payments WHERE created_at >= datetime('now', '-7 days') AND status = 'approved'"
+    ).get();
+
+    // Revenue: este mes (últimos 30 días)
+    const revenueMonth = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) as revenue, COUNT(*) as count FROM payments WHERE created_at >= datetime('now', '-30 days') AND status = 'approved'"
+    ).get();
+
+    // Total refunded
+    const totalRefunded = db.prepare(
+      "SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count FROM payments WHERE status = 'refunded'"
+    ).get();
+
+    const statusMap = {};
+    for (const s of byStatus) {
+      statusMap[s.status] = { count: s.count, total_amount: s.total_amount };
+    }
+
+    res.json({
+      data: {
+        totalPayments: totalPayments ? totalPayments.count : 0,
+        byStatus: statusMap,
+        revenue: {
+          today: { amount: revenueToday ? revenueToday.revenue : 0, payments: revenueToday ? revenueToday.count : 0 },
+          week: { amount: revenueWeek ? revenueWeek.revenue : 0, payments: revenueWeek ? revenueWeek.count : 0 },
+          month: { amount: revenueMonth ? revenueMonth.revenue : 0, payments: revenueMonth ? revenueMonth.count : 0 },
+        },
+        refunded: {
+          total: totalRefunded ? totalRefunded.total : 0,
+          count: totalRefunded ? totalRefunded.count : 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error getting stats:', error);
+    res.status(500).json({ error: 'Error al obtener estadísticas de pagos' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/payments — List all payments (admin)
+// ──────────────────────────────────────────────
+router.get('/', roleMiddleware('admin'), (req, res) => {
+  try {
+    const db = getDb();
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 10));
+    const offset = (page - 1) * limit;
+    const status = req.query.status;
+
+    let countSql = 'SELECT COUNT(*) as total FROM payments WHERE 1=1';
+    let dataSql = 'SELECT * FROM payments WHERE 1=1';
+    const params = [];
+
+    if (status && VALID_STATUSES.includes(status)) {
+      countSql += ' AND status = ?';
+      dataSql += ' AND status = ?';
+      params.push(status);
+    }
+
+    dataSql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+
+    const countResult = db.prepare(countSql).get(...params);
+    const total = countResult ? countResult.total : 0;
+    const payments = db.prepare(dataSql).all(...params, limit, offset);
+
+    res.json({
+      data: payments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error listing payments:', error);
+    res.status(500).json({ error: 'Error al listar los pagos' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/payments/:id — Payment detail with logs (admin)
+// ──────────────────────────────────────────────
+router.get('/:id', roleMiddleware('admin'), [
+  param('id').notEmpty().withMessage('El ID del pago es requerido'),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const { id } = req.params;
+
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Pago no encontrado' });
+    }
+
+    const logs = db.prepare('SELECT * FROM payment_logs WHERE payment_id = ? ORDER BY created_at DESC').all(id);
+
+    res.json({
+      data: { ...payment, logs },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error getting payment detail:', error);
+    res.status(500).json({ error: 'Error al obtener el detalle del pago' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// POST /api/payments/:id/refund — Initiate refund (admin)
+// ──────────────────────────────────────────────
+router.post('/:id/refund', roleMiddleware('admin'), [
+  param('id').notEmpty().withMessage('El ID del pago es requerido'),
+  body('reason')
+    .optional().isString().withMessage('La razón debe ser texto'),
+], (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const { id } = req.params;
+    const { reason } = req.body;
+    const adminId = req.user.id || req.user.userId;
+
+    const payment = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Pago no encontrado' });
+    }
+
+    if (payment.status !== 'approved') {
+      return res.status(400).json({
+        error: `Solo se pueden reembolsar pagos aprobados. Estado actual: ${payment.status}`,
+      });
+    }
+
+    // Update payment status to refunded
+    db.prepare(
+      "UPDATE payments SET status = 'refunded', updated_at = datetime('now') WHERE id = ?"
+    ).run(id);
+
+    // Log refund
+    db.prepare(
+      `INSERT INTO payment_logs (id, payment_id, event, data)
+       VALUES (?, ?, 'refund_initiated', ?)`
+    ).run(uuidv4(), id, JSON.stringify({
+      reason: reason || '',
+      refunded_by: adminId,
+      original_amount: payment.amount,
+      refund_date: new Date().toISOString(),
+    }));
+
+    const updatedPayment = db.prepare('SELECT * FROM payments WHERE id = ?').get(id);
+    const logs = db.prepare('SELECT * FROM payment_logs WHERE payment_id = ? ORDER BY created_at DESC').all(id);
+
+    res.json({
+      message: 'Reembolso iniciado exitosamente',
+      data: { ...updatedPayment, logs },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error processing refund:', error);
+    res.status(500).json({ error: 'Error al procesar el reembolso' });
+  }
+});
+
+module.exports = router;
