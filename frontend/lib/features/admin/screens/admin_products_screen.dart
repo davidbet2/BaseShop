@@ -36,7 +36,6 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     super.initState();
     _bloc = getIt<ProductsBloc>();
     _bloc.add(const LoadProducts());
-    _bloc.add(const LoadCategories());
   }
 
   @override
@@ -519,6 +518,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                       const SizedBox(height: 12),
                       // Category dropdown
                       BlocBuilder<ProductsBloc, ProductsState>(
+                        bloc: _bloc,
                         builder: (context, state) {
                           List<Map<String, dynamic>> cats = [];
                           if (state is ProductsLoaded) {

@@ -44,6 +44,9 @@ class ProductsRepository {
     );
 
     final data = response.data;
+    if (data is! Map<String, dynamic>) {
+      return {'data': [], 'total': 0, 'page': page};
+    }
     final pagination = data['pagination'];
     return {
       'data': data['products'] ?? data['data'] ?? [],
