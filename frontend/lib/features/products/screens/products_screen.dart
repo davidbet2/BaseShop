@@ -239,13 +239,14 @@ class _ProductsScreenState extends State<ProductsScreen> {
   }
 
   Widget _buildProductCard(Map<String, dynamic> p) {
-    final imageUrl = (p['image_url'] ?? p['imageUrl'] ?? '').toString();
+    final images = p['images'] as List? ?? [];
+    final imageUrl = images.isNotEmpty ? images.first.toString() : '';
     final name = (p['name'] ?? '').toString();
-    final price = double.tryParse(p['price']?.toString() ?? '0') ?? 0;
-    final discount = double.tryParse(p['discount']?.toString() ?? '0') ?? 0;
-    final id = p['id']?.toString() ?? '';
-    final hasDiscount = discount > 0;
-    final discountedPrice = hasDiscount ? price * (1 - discount / 100) : price;
+    final price = (p['price'] as num?)?.toDouble() ?? 0;
+    final comparePrice = (p['compare_price'] as num?)?.toDouble() ?? 0;
+    final id = (p['_id'] ?? p['id'] ?? '').toString();
+    final hasDiscount = comparePrice > price && comparePrice > 0;
+    final discountPct = hasDiscount ? ((comparePrice - price) / comparePrice * 100).round() : 0;
 
     return GestureDetector(
       onTap: () => context.push('/products/$id'),
@@ -288,7 +289,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(color: AppTheme.errorColor, borderRadius: BorderRadius.circular(8)),
-                        child: Text('-${discount.toInt()}%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                        child: Text('-$discountPct%', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   Positioned(
@@ -314,11 +315,11 @@ class _ProductsScreenState extends State<ProductsScreen> {
                       style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary, height: 1.3)),
                     const Spacer(),
                     if (hasDiscount) ...[
-                      Text('\$${price.toStringAsFixed(0)}',
+                      Text('\$${comparePrice.toStringAsFixed(0)}',
                         style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, decoration: TextDecoration.lineThrough)),
                       const SizedBox(height: 2),
                     ],
-                    Text('\$${discountedPrice.toStringAsFixed(0)}',
+                    Text('\$${price.toStringAsFixed(0)}',
                       style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
                   ],
                 ),

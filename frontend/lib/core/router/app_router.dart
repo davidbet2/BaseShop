@@ -1,12 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/router/not_found_screen.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
+import 'package:baseshop/features/products/bloc/products_bloc.dart';
 
 import 'package:baseshop/features/auth/screens/login_screen.dart';
 import 'package:baseshop/features/auth/screens/register_screen.dart';
@@ -124,8 +126,11 @@ final GoRouter appRouter = GoRouter(
         ),
         GoRoute(
           path: '/products',
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: ProductsScreen(),
+          pageBuilder: (context, state) => NoTransitionPage(
+            child: BlocProvider(
+              create: (_) => getIt<ProductsBloc>(),
+              child: const ProductsScreen(),
+            ),
           ),
         ),
         GoRoute(
@@ -178,7 +183,10 @@ final GoRouter appRouter = GoRouter(
       path: '/products/:id',
       builder: (context, state) {
         final productId = state.pathParameters['id']!;
-        return ProductDetailScreen(productId: productId);
+        return BlocProvider(
+          create: (_) => getIt<ProductsBloc>(),
+          child: ProductDetailScreen(productId: productId),
+        );
       },
     ),
     GoRoute(
