@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -135,12 +136,54 @@ class ApiClient {
     return _cachedToken;
   }
 
+  // Bump this version to force a one-time token reset on all clients
+  static const String _storageVersion = '2';
+
   Future<void> loadTokensFromStorage() async {
     try {
+      // Check storage version — clear stale tokens from previous builds
+      final version = await _storage.read(key: 'storage_version');
+      if (version != _storageVersion) {
+        debugPrint('[ApiClient] Storage version mismatch ($version != $_storageVersion) — clearing tokens');
+        await clearTokens();
+        await _storage.write(key: 'storage_version', value: _storageVersion);
+        return;
+      }
+
       _cachedToken = await _storage.read(key: 'access_token');
       _cachedRefreshToken = await _storage.read(key: 'refresh_token');
+
+      // Validate JWT expiry client-side
+      if (_cachedToken != null && _isTokenExpired(_cachedToken!)) {
+        debugPrint('[ApiClient] Stored token is expired — clearing');
+        await clearTokens();
+      }
     } catch (e) {
       debugPrint('[ApiClient] loadTokensFromStorage error: $e');
+    }
+  }
+
+  /// Decode JWT payload and check if `exp` claim is in the past.
+  bool _isTokenExpired(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+      // Base64-decode the payload (part[1])
+      String payload = parts[1];
+      // Pad to multiple of 4
+      switch (payload.length % 4) {
+        case 2: payload += '=='; break;
+        case 3: payload += '=';  break;
+      }
+      final decoded = utf8.decode(base64Url.decode(payload));
+      final data = jsonDecode(decoded) as Map<String, dynamic>;
+      final exp = data['exp'] as int?;
+      if (exp == null) return false; // No expiry claim → assume valid
+      final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      return DateTime.now().isAfter(expiryDate);
+    } catch (e) {
+      debugPrint('[ApiClient] JWT decode error: $e');
+      return true; // Can't decode → treat as invalid
     }
   }
 }
