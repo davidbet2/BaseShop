@@ -9,313 +9,215 @@ import 'package:baseshop/features/auth/bloc/auth_state.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
-
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _firstNameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  bool _obscurePassword = true;
-  bool _obscureConfirm = true;
+  final _firstNameCtrl = TextEditingController();
+  final _lastNameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+  bool _obscure1 = true;
+  bool _obscure2 = true;
 
   @override
   void dispose() {
-    _firstNameController.dispose();
-    _lastNameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
+    _firstNameCtrl.dispose();
+    _lastNameCtrl.dispose();
+    _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
     super.dispose();
   }
 
   void _onRegister() {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthBloc>().add(AuthRegisterRequested(
-          firstName: _firstNameController.text.trim(),
-          lastName: _lastNameController.text.trim(),
-          email: _emailController.text.trim(),
-          phone: _phoneController.text.trim().isNotEmpty
-              ? _phoneController.text.trim()
-              : null,
-          password: _passwordController.text,
-        ));
-  }
-
-  void _onGoogleSignIn() {
-    context.read<AuthBloc>().add(const AuthGoogleSignInRequested());
+      firstName: _firstNameCtrl.text.trim(),
+      lastName: _lastNameCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
+      password: _passwordCtrl.text,
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: BlocListener<AuthBloc, AuthState>(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppTheme.textPrimary),
+          ),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
+        ),
+        elevation: 0,
+      ),
+      body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             context.go('/home');
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppTheme.errorColor,
-                behavior: SnackBarBehavior.floating,
-              ),
+              SnackBar(content: Text(state.message), backgroundColor: AppTheme.errorColor),
             );
           }
         },
-        child: SafeArea(
-          child: Center(
+        builder: (context, state) {
+          final isLoading = state is AuthLoading;
+          return SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Form(
                 key: _formKey,
-                child: BlocBuilder<AuthBloc, AuthState>(
-                  builder: (context, state) {
-                    final isLoading = state is AuthLoading;
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(Icons.person_add_rounded, size: 28, color: AppTheme.primaryColor),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text('Crea tu cuenta', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 6),
+                    const Text('Completa tus datos para empezar', style: TextStyle(fontSize: 15, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 28),
 
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // ── Title ─────────────────────────────
-                        const Icon(
-                          Icons.store_rounded,
-                          size: 64,
-                          color: AppTheme.primaryColor,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Crear cuenta',
-                          style: Theme.of(context)
-                              .textTheme
-                              .headlineSmall
-                              ?.copyWith(
-                                color: AppTheme.primaryColor,
-                                fontWeight: FontWeight.bold,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Completa tus datos para registrarte',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 28),
+                    // Name row
+                    Row(children: [
+                      Expanded(child: _buildField('Nombre', _firstNameCtrl, 'Juan', Icons.person_outline_rounded,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null)),
+                      const SizedBox(width: 12),
+                      Expanded(child: _buildField('Apellido', _lastNameCtrl, 'P\u00e9rez', Icons.person_outline_rounded,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null)),
+                    ]),
+                    const SizedBox(height: 16),
 
-                        // ── First name ────────────────────────
-                        TextFormField(
-                          controller: _firstNameController,
-                          textInputAction: TextInputAction.next,
-                          textCapitalization: TextCapitalization.words,
-                          decoration: const InputDecoration(
-                            labelText: 'Nombre',
-                            prefixIcon: Icon(Icons.person_outline),
+                    _buildField('Correo electr\u00f3nico', _emailCtrl, 'tu@email.com', Icons.email_outlined,
+                      inputType: TextInputType.emailAddress,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Requerido';
+                        if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Correo inv\u00e1lido';
+                        return null;
+                      }),
+                    const SizedBox(height: 16),
+
+                    _buildField('Tel\u00e9fono', _phoneCtrl, '+57 300 000 0000', Icons.phone_outlined,
+                      inputType: TextInputType.phone,
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Requerido' : null),
+                    const SizedBox(height: 16),
+
+                    // Password
+                    const Text('Contrase\u00f1a', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passwordCtrl,
+                      obscureText: _obscure1,
+                      decoration: InputDecoration(
+                        hintText: 'M\u00ednimo 6 caracteres',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _obscure1 = !_obscure1),
+                          icon: Icon(_obscure1 ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Requerido';
+                        if (v.length < 6) return 'M\u00ednimo 6 caracteres';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Confirm password
+                    const Text('Confirmar contrase\u00f1a', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _confirmCtrl,
+                      obscureText: _obscure2,
+                      decoration: InputDecoration(
+                        hintText: 'Repite tu contrase\u00f1a',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _obscure2 = !_obscure2),
+                          icon: Icon(_obscure2 ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
+                        ),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Requerido';
+                        if (v != _passwordCtrl.text) return 'Las contrase\u00f1as no coinciden';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 28),
+
+                    SizedBox(
+                      width: double.infinity, height: 56,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _onRegister,
+                        child: isLoading
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                          : const Text('Crear cuenta', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    Center(
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('\u00bfYa tienes cuenta? ', style: TextStyle(color: AppTheme.textSecondary)),
+                          GestureDetector(
+                            onTap: () => context.go('/login'),
+                            child: const Text('Inicia sesi\u00f3n', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
                           ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Ingresa tu nombre';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        // ── Last name ─────────────────────────
-                        TextFormField(
-                          controller: _lastNameController,
-                          textInputAction: TextInputAction.next,
-                          textCapitalization: TextCapitalization.words,
-                          decoration: const InputDecoration(
-                            labelText: 'Apellido',
-                            prefixIcon: Icon(Icons.person_outline),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Ingresa tu apellido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        // ── Email ─────────────────────────────
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Correo electrónico',
-                            prefixIcon: Icon(Icons.email_outlined),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.trim().isEmpty) {
-                              return 'Ingresa tu correo electrónico';
-                            }
-                            final emailRegex = RegExp(
-                                r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                            if (!emailRegex.hasMatch(value.trim())) {
-                              return 'Ingresa un correo válido';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        // ── Phone (optional) ──────────────────
-                        TextFormField(
-                          controller: _phoneController,
-                          keyboardType: TextInputType.phone,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Teléfono (opcional)',
-                            prefixIcon: Icon(Icons.phone_outlined),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // ── Password ──────────────────────────
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: _obscurePassword,
-                          textInputAction: TextInputAction.next,
-                          decoration: InputDecoration(
-                            labelText: 'Contraseña',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              onPressed: () => setState(
-                                  () => _obscurePassword = !_obscurePassword),
-                              icon: Icon(_obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Ingresa una contraseña';
-                            }
-                            if (value.length < 6) {
-                              return 'Mínimo 6 caracteres';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 14),
-
-                        // ── Confirm password ──────────────────
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: _obscureConfirm,
-                          textInputAction: TextInputAction.done,
-                          onFieldSubmitted: (_) => _onRegister(),
-                          decoration: InputDecoration(
-                            labelText: 'Confirmar contraseña',
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              onPressed: () => setState(
-                                  () => _obscureConfirm = !_obscureConfirm),
-                              icon: Icon(_obscureConfirm
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Confirma tu contraseña';
-                            }
-                            if (value != _passwordController.text) {
-                              return 'Las contraseñas no coinciden';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ── Register button ───────────────────
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: isLoading ? null : _onRegister,
-                            child: isLoading
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.5,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Crear cuenta'),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        // ── Divider ───────────────────────────
-                        Row(
-                          children: [
-                            const Expanded(child: Divider()),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text(
-                                'o continúa con',
-                                style: TextStyle(color: Colors.grey[500]),
-                              ),
-                            ),
-                            const Expanded(child: Divider()),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-
-                        // ── Google Sign-In ────────────────────
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton.icon(
-                            onPressed: isLoading ? null : _onGoogleSignIn,
-                            icon: Image.network(
-                              'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                              width: 22,
-                              height: 22,
-                              errorBuilder: (_, __, ___) =>
-                                  const Icon(Icons.g_mobiledata, size: 28),
-                            ),
-                            label: const Text('Google'),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // ── Login link ────────────────────────
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '¿Ya tienes cuenta? ',
-                              style: TextStyle(color: Colors.grey[600]),
-                            ),
-                            TextButton(
-                              onPressed: () => context.go('/login'),
-                              child: const Text('Inicia sesión'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
               ),
             ),
-          ),
-        ),
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildField(String label, TextEditingController ctrl, String hint, IconData icon, {
+    TextInputType inputType = TextInputType.text,
+    String? Function(String?)? validator,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: ctrl,
+          keyboardType: inputType,
+          decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon, size: 20)),
+          validator: validator,
+        ),
+      ],
     );
   }
 }

@@ -9,7 +9,6 @@ import 'package:baseshop/features/auth/bloc/auth_state.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
-
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -30,204 +29,174 @@ class _LoginScreenState extends State<LoginScreen> {
   void _onLogin() {
     if (!_formKey.currentState!.validate()) return;
     context.read<AuthBloc>().add(AuthLoginRequested(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
-        ));
-  }
-
-  void _onGoogleSignIn() {
-    context.read<AuthBloc>().add(const AuthGoogleSignInRequested());
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF3F4F6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppTheme.textPrimary),
+          ),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/home'),
+        ),
+        elevation: 0,
+      ),
       body: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state is AuthAuthenticated) {
-            context.go('/home');
+            final role = (state.user['role']?.toString().toLowerCase() ?? '');
+            context.go(role == 'admin' ? '/admin/dashboard' : '/home');
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(state.message),
-                backgroundColor: AppTheme.errorColor,
-                behavior: SnackBarBehavior.floating,
-              ),
+              SnackBar(content: Text(state.message), backgroundColor: AppTheme.errorColor),
             );
           }
         },
         builder: (context, state) {
           final isLoading = state is AuthLoading;
-
           return SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ── Logo / Title ────────────────────────
-                      const Icon(
-                        Icons.store_rounded,
-                        size: 80,
-                        color: AppTheme.primaryColor,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 20),
+                    // Logo
+                    Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'BaseShop',
-                        style: Theme.of(context)
-                            .textTheme
-                            .headlineMedium
-                            ?.copyWith(
-                              color: AppTheme.primaryColor,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Inicia sesión para continuar',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodyMedium
-                            ?.copyWith(color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 36),
+                      child: const Icon(Icons.shopping_bag_rounded, size: 28, color: AppTheme.primaryColor),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text('Bienvenido de\nvuelta',
+                      style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, height: 1.2)),
+                    const SizedBox(height: 8),
+                    const Text('Inicia sesi\u00f3n para continuar comprando',
+                      style: TextStyle(fontSize: 15, color: AppTheme.textSecondary)),
+                    const SizedBox(height: 32),
 
-                      // ── Email ───────────────────────────────
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'Correo electrónico',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Ingresa tu correo electrónico';
-                          }
-                          final emailRegex = RegExp(
-                              r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$');
-                          if (!emailRegex.hasMatch(value.trim())) {
-                            return 'Ingresa un correo válido';
-                          }
-                          return null;
-                        },
+                    // Email
+                    const Text('Correo electr\u00f3nico', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        hintText: 'tu@email.com',
+                        prefixIcon: Icon(Icons.email_outlined, size: 20),
                       ),
-                      const SizedBox(height: 16),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
+                        if (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(v.trim())) return 'Correo inv\u00e1lido';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
 
-                      // ── Password ────────────────────────────
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        onFieldSubmitted: (_) => _onLogin(),
-                        decoration: InputDecoration(
-                          labelText: 'Contraseña',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword),
-                            icon: Icon(_obscurePassword
-                                ? Icons.visibility_off_outlined
-                                : Icons.visibility_outlined),
-                          ),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingresa tu contraseña';
-                          }
-                          if (value.length < 6) {
-                            return 'Mínimo 6 caracteres';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 8),
-
-                      // ── Forgot password ─────────────────────
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => context.push('/forgot-password'),
-                          child: const Text('¿Olvidaste tu contraseña?'),
+                    // Password
+                    const Text('Contrase\u00f1a', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _passwordController,
+                      obscureText: _obscurePassword,
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _onLogin(),
+                      decoration: InputDecoration(
+                        hintText: '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022',
+                        prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20),
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Ingresa tu contrase\u00f1a';
+                        if (v.length < 6) return 'M\u00ednimo 6 caracteres';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {},
+                        child: const Text('\u00bfOlvidaste tu contrase\u00f1a?', style: TextStyle(fontSize: 13)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
 
-                      // ── Login button ────────────────────────
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: isLoading ? null : _onLogin,
-                          child: isLoading
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text('Iniciar sesión'),
+                    // Login button
+                    SizedBox(
+                      width: double.infinity, height: 56,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : _onLogin,
+                        child: isLoading
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                          : const Text('Iniciar sesi\u00f3n', style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Divider
+                    Row(children: [
+                      const Expanded(child: Divider(color: AppTheme.dividerColor)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('o', style: TextStyle(color: Colors.grey.shade400, fontSize: 14)),
+                      ),
+                      const Expanded(child: Divider(color: AppTheme.dividerColor)),
+                    ]),
+                    const SizedBox(height: 24),
+
+                    // Google
+                    SizedBox(
+                      width: double.infinity, height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: isLoading ? null : () => context.read<AuthBloc>().add(const AuthGoogleSignInRequested()),
+                        icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                        label: const Text('Continuar con Google'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppTheme.textPrimary,
+                          side: const BorderSide(color: AppTheme.dividerColor),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                    ),
+                    const SizedBox(height: 32),
 
-                      // ── Divider ─────────────────────────────
-                      Row(
-                        children: [
-                          const Expanded(child: Divider()),
-                          Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              'o continúa con',
-                              style: TextStyle(color: Colors.grey[500]),
-                            ),
-                          ),
-                          const Expanded(child: Divider()),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // ── Google Sign-In ──────────────────────
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton.icon(
-                          onPressed: isLoading ? null : _onGoogleSignIn,
-                          icon: Image.network(
-                            'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                            width: 22,
-                            height: 22,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.g_mobiledata, size: 28),
-                          ),
-                          label: const Text('Google'),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ── Register link ───────────────────────
-                      Row(
+                    // Register link
+                    Center(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Text(
-                            '¿No tienes cuenta? ',
-                            style: TextStyle(color: Colors.grey[600]),
-                          ),
-                          TextButton(
-                            onPressed: () => context.go('/register'),
-                            child: const Text('Regístrate'),
+                          const Text('\u00bfNo tienes cuenta? ', style: TextStyle(color: AppTheme.textSecondary)),
+                          GestureDetector(
+                            onTap: () => context.go('/register'),
+                            child: const Text('Reg\u00edstrate', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700)),
                           ),
                         ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
                 ),
               ),
             ),
