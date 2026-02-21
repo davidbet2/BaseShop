@@ -129,7 +129,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
               onPressed: () {
                 context.read<FavoritesBloc>().add(
-                      AddFavorite(productId),
+                      AddFavorite(
+                        productId: productId,
+                        productName: name,
+                        productPrice: price,
+                        productImage: images.isNotEmpty ? images.first : '',
+                      ),
                     );
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
@@ -475,6 +480,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final inStock = ((product['stock'] as num?)?.toInt() ?? 0) > 0;
     final productId =
         product['_id']?.toString() ?? product['id']?.toString() ?? '';
+    final name = product['name']?.toString() ?? '';
+    final price = (product['price'] as num?)?.toDouble() ?? 0;
+    final images = List<String>.from(
+      (product['images'] as List?)?.map((e) => e.toString()) ?? [],
+    );
 
     return SafeArea(
       child: Container(
@@ -539,6 +549,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         context.read<CartBloc>().add(
                               AddToCart(
                                 productId: productId,
+                                productName: name,
+                                productPrice: price,
+                                productImage: images.isNotEmpty ? images.first : '',
                                 quantity: _quantity,
                               ),
                             );

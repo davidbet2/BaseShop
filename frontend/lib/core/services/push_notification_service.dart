@@ -15,7 +15,7 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class PushNotificationService {
   final ApiClient _apiClient;
-  final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FirebaseMessaging? _messaging;
   final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
   String? _currentToken;
@@ -25,7 +25,9 @@ class PushNotificationService {
   Future<void> initialize() async {
     if (kIsWeb) return;
 
-    final settings = await _messaging.requestPermission(
+    _messaging = FirebaseMessaging.instance;
+
+    final settings = await _messaging!.requestPermission(
       alert: true,
       badge: true,
       sound: true,
@@ -37,10 +39,10 @@ class PushNotificationService {
     FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
     FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
 
-    final initialMessage = await _messaging.getInitialMessage();
+    final initialMessage = await _messaging!.getInitialMessage();
     if (initialMessage != null) _handleNotificationTap(initialMessage);
 
-    _messaging.onTokenRefresh.listen((newToken) {
+    _messaging!.onTokenRefresh.listen((newToken) {
       _currentToken = newToken;
       _registerTokenWithBackend(newToken);
     });
@@ -75,7 +77,7 @@ class PushNotificationService {
 
   Future<void> registerToken() async {
     try {
-      final token = await _messaging.getToken();
+      final token = await _messaging?.getToken();
       if (token != null) {
         _currentToken = token;
         await _registerTokenWithBackend(token);

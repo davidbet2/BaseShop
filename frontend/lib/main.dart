@@ -2,8 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/network/api_client.dart';
@@ -18,15 +17,6 @@ import 'package:baseshop/features/favorites/bloc/favorites_bloc.dart';
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-
-    // ── Firebase ──────────────────────────────────────────
-    try {
-      await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(
-          firebaseMessagingBackgroundHandler);
-    } catch (e) {
-      debugPrint('[Main] Firebase init error: $e');
-    }
 
     // ── Error widget for release mode ────────────────────
     if (kReleaseMode) {
@@ -45,13 +35,19 @@ void main() {
     configureDependencies();
 
     // ── Load tokens from secure storage ──────────────────
-    await getIt<ApiClient>().loadTokensFromStorage();
-
-    // ── Push notifications ───────────────────────────────
     try {
-      await getIt<PushNotificationService>().initialize();
+      await getIt<ApiClient>().loadTokensFromStorage();
     } catch (e) {
-      debugPrint('[Main] Push notifications init error: $e');
+      debugPrint('[Main] Load tokens error: $e');
+    }
+
+    // ── Push notifications (mobile only) ─────────────────
+    if (!kIsWeb) {
+      try {
+        await getIt<PushNotificationService>().initialize();
+      } catch (e) {
+        debugPrint('[Main] Push notifications init error: $e');
+      }
     }
 
     // ── Check auth state ─────────────────────────────────
@@ -62,13 +58,6 @@ void main() {
     debugPrint('[Main] Unhandled error: $error');
     debugPrint('[Main] Stack trace: $stackTrace');
   });
-}
-
-/// Background message handler — must be top-level function.
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  debugPrint('[FCM] Background message: ${message.messageId}');
 }
 
 class MyApp extends StatelessWidget {
@@ -88,6 +77,11 @@ class MyApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         routerConfig: appRouter,
         locale: const Locale('es', 'CO'),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         supportedLocales: const [
           Locale('es', 'CO'),
           Locale('es'),
