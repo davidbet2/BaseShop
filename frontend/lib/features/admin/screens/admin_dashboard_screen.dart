@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:baseshop/core/di/injection.dart';
+import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
 
 /// Admin Dashboard Screen.
 ///
 /// Displays summary stats (orders, revenue, products, customers) and
 /// a list of recent orders with quick‑action buttons.
-///
-/// TODO: Connect to real API stats endpoint (GET /orders/stats/summary)
-///       and products count once the admin BLoC layer is implemented.
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -26,50 +24,44 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     decimalDigits: 0,
   );
 
-  // ── Placeholder data ────────────────────────────────────────────────
-  // TODO: Replace with real data fetched from orders/stats and products count
-  final int _totalOrders = 156;
-  final double _monthlyRevenue = 12450000;
-  final int _activeProducts = 83;
-  final int _totalCustomers = 342;
+  bool _isLoading = true;
+  int _totalOrders = 0;
+  double _monthlyRevenue = 0;
+  int _activeProducts = 0;
+  int _totalCustomers = 0;
+  List<Map<String, dynamic>> _recentOrders = [];
 
-  final List<Map<String, dynamic>> _recentOrders = const [
-    {
-      'order_number': 'ORD-20260215-001',
-      'customer': 'Juan Pérez',
-      'total': 245000,
-      'status': 'pending',
-      'date': '2026-02-15',
-    },
-    {
-      'order_number': 'ORD-20260214-005',
-      'customer': 'María López',
-      'total': 189000,
-      'status': 'confirmed',
-      'date': '2026-02-14',
-    },
-    {
-      'order_number': 'ORD-20260214-003',
-      'customer': 'Carlos Gómez',
-      'total': 520000,
-      'status': 'shipped',
-      'date': '2026-02-14',
-    },
-    {
-      'order_number': 'ORD-20260213-012',
-      'customer': 'Ana Rodríguez',
-      'total': 98000,
-      'status': 'delivered',
-      'date': '2026-02-13',
-    },
-    {
-      'order_number': 'ORD-20260213-008',
-      'customer': 'Pedro Martínez',
-      'total': 372000,
-      'status': 'processing',
-      'date': '2026-02-13',
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadDashboardData();
+  }
+
+  Future<void> _loadDashboardData() async {
+    setState(() => _isLoading = true);
+    final dio = getIt<ApiClient>().dio;
+
+    try {
+      // Fetch products count
+      final productsRes = await dio.get('/products', queryParameters: {'limit': 1});
+      final pagination = productsRes.data?['pagination'];
+      _activeProducts = pagination?['total'] as int? ?? 0;
+    } catch (_) {}
+
+    try {
+      // Fetch orders
+      final ordersRes = await dio.get('/orders/me');
+      final ordersData = ordersRes.data;
+      final ordersList = List<Map<String, dynamic>>.from(
+          ordersData?['data'] ?? ordersData?['orders'] ?? []);
+      _totalOrders = ordersList.length;
+      _recentOrders = ordersList.take(5).toList();
+      _monthlyRevenue = ordersList.fold<double>(
+          0, (sum, o) => sum + ((o['total'] as num?)?.toDouble() ?? 0));
+    } catch (_) {}
+
+    if (mounted) setState(() => _isLoading = false);
+  }
 
   // ── Status helpers ──────────────────────────────────────────────────
 
@@ -101,10 +93,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          // TODO: Dispatch refresh event to admin stats BLoC
-          await Future<void>.delayed(const Duration(milliseconds: 500));
+          await _loadDashboardData();
         },
-        child: ListView(
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _buildStatsGrid(),

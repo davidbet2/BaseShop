@@ -40,3 +40,31 @@ class LoadProductDetail extends ProductsEvent {
 class LoadCategories extends ProductsEvent {
   const LoadCategories();
 }
+
+class CreateProduct extends ProductsEvent {
+  final Map<String, dynamic> payload;
+
+  const CreateProduct({required this.payload});
+
+  @override
+  List<Object?> get props => [payload];
+}
+
+class UpdateProduct extends ProductsEvent {
+  final String productId;
+  final Map<String, dynamic> payload;
+
+  const UpdateProduct({required this.productId, required this.payload});
+
+  @override
+  List<Object?> get props => [productId, payload];
+}
+
+class DeleteProduct extends ProductsEvent {
+  final String productId;
+
+  const DeleteProduct({required this.productId});
+
+  @override
+  List<Object?> get props => [productId];
+}

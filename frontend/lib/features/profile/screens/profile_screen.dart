@@ -104,26 +104,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // TODO: Navigate to addresses screen
                 },
               ),
-              _buildMenuItem(
-                icon: Icons.favorite_border,
-                title: 'Mis Favoritos',
-                subtitle: 'Productos guardados',
-                onTap: () => context.go('/favorites'),
-              ),
-              _buildMenuItem(
-                icon: Icons.receipt_long_outlined,
-                title: 'Mis Pedidos',
-                subtitle: 'Historial de compras',
-                onTap: () => context.go('/orders'),
-              ),
-              _buildMenuItem(
-                icon: Icons.rate_review_outlined,
-                title: 'Mis Reseñas',
-                subtitle: 'Reseñas que has escrito',
-                onTap: () {
-                  // TODO: Navigate to my reviews screen
-                },
-              ),
+              if (role != 'admin') ...[
+                _buildMenuItem(
+                  icon: Icons.favorite_border,
+                  title: 'Mis Favoritos',
+                  subtitle: 'Productos guardados',
+                  onTap: () => context.go('/favorites'),
+                ),
+                _buildMenuItem(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Mis Pedidos',
+                  subtitle: 'Historial de compras',
+                  onTap: () => context.go('/orders'),
+                ),
+                _buildMenuItem(
+                  icon: Icons.rate_review_outlined,
+                  title: 'Mis Reseñas',
+                  subtitle: 'Reseñas que has escrito',
+                  onTap: () {
+                    // TODO: Navigate to my reviews screen
+                  },
+                ),
+              ],
 
               const Divider(height: 1),
               const SizedBox(height: 8),

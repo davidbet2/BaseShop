@@ -46,8 +46,8 @@ class AuthRepository {
       data: {
         'email': email,
         'password': password,
-        'firstName': firstName,
-        'lastName': lastName,
+        'first_name': firstName,
+        'last_name': lastName,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
         'recaptchaToken': recaptchaToken,
       },

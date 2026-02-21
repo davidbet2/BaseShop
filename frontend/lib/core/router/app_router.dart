@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -21,38 +23,86 @@ import 'package:baseshop/features/admin/screens/admin_orders_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:baseshop/features/home/screens/shell_screen.dart';
 
-// ── Public paths (no auth required) ─────────────────────────
-const _publicPaths = <String>{
+// ── Auth-only paths (require login) ─────────────────────────
+const _authRequiredPaths = <String>{
+  '/cart',
+  '/orders',
+  '/favorites',
+  '/profile',
+  '/admin/dashboard',
+  '/admin/products',
+  '/admin/orders',
+};
+
+// ── Auth pages (login/register) ─────────────────────────────
+const _authPages = <String>{
   '/login',
   '/register',
   '/forgot-password',
 };
 
+// ── Admin-only paths ────────────────────────────────────────
+const _adminPaths = <String>{
+  '/admin/dashboard',
+  '/admin/products',
+  '/admin/orders',
+};
+
+/// Listenable that notifies GoRouter when auth state changes.
+class _AuthNotifier extends ChangeNotifier {
+  late final StreamSubscription<AuthState> _sub;
+
+  _AuthNotifier() {
+    _sub = getIt<AuthBloc>().stream.listen((_) => notifyListeners());
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}
+
+final _authNotifier = _AuthNotifier();
+
 // ── Router ──────────────────────────────────────────────────
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/login',
+  initialLocation: '/home',
   debugLogDiagnostics: true,
+  refreshListenable: _authNotifier,
   redirect: (BuildContext context, GoRouterState state) {
-    final isAuthenticated =
-        getIt<AuthBloc>().state is AuthAuthenticated;
+    final authState = getIt<AuthBloc>().state;
+    final isAuthenticated = authState is AuthAuthenticated;
     final currentPath = state.matchedLocation;
-    final isPublicRoute = _publicPaths.contains(currentPath);
+    final isAuthPage = _authPages.contains(currentPath);
+    final isAuthRequired = _authRequiredPaths.contains(currentPath) ||
+        currentPath.startsWith('/orders/') ||
+        currentPath.startsWith('/admin/');
 
-    // Not authenticated → force login (unless already on public route)
-    if (!isAuthenticated && !isPublicRoute) {
+    // ── Not authenticated trying to access protected route → login
+    if (!isAuthenticated && isAuthRequired) {
       return '/login';
     }
 
-    // Authenticated but on a public route → redirect to home
-    if (isAuthenticated && isPublicRoute) {
-      return '/home';
+    // ── Authenticated on login/register → redirect to home (or admin dashboard)
+    if (isAuthenticated && isAuthPage) {
+      final role =
+          (authState as AuthAuthenticated).user['role']?.toString().toLowerCase() ?? '';
+      return role == 'admin' ? '/admin/dashboard' : '/home';
+    }
+
+    // ── Admin-only paths: authenticated non-admin → home
+    if (isAuthenticated && _adminPaths.contains(currentPath)) {
+      final role =
+          (authState as AuthAuthenticated).user['role']?.toString().toLowerCase() ?? '';
+      if (role != 'admin') return '/home';
     }
 
     return null; // no redirect
   },
   errorBuilder: (context, state) => const NotFoundScreen(),
   routes: [
-    // ── Public routes ────────────────────────────────────────
+    // ── Auth routes (outside shell) ──────────────────────────
     GoRoute(
       path: '/login',
       builder: (context, state) => const LoginScreen(),

@@ -15,49 +15,35 @@ import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/favorites/bloc/favorites_bloc.dart';
 
 void main() {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
 
-    // ── Error widget for release mode ────────────────────
-    if (kReleaseMode) {
-      ErrorWidget.builder = (details) => const Material(
-            child: Center(
-              child: Text(
-                'Ha ocurrido un error inesperado',
-                style: TextStyle(fontSize: 16),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          );
-    }
+  // ── Dependency injection ─────────────────────────────
+  configureDependencies();
 
-    // ── Dependency injection ─────────────────────────────
-    configureDependencies();
+  // ── Load tokens (fire and forget on web) ───────────────
+  _initApp();
 
-    // ── Load tokens from secure storage ──────────────────
+  runApp(const MyApp());
+}
+
+Future<void> _initApp() async {
+  try {
+    await getIt<ApiClient>().loadTokensFromStorage();
+  } catch (e) {
+    debugPrint('[Main] Load tokens error: $e');
+  }
+
+  // ── Push notifications (mobile only) ─────────────────
+  if (!kIsWeb) {
     try {
-      await getIt<ApiClient>().loadTokensFromStorage();
+      await getIt<PushNotificationService>().initialize();
     } catch (e) {
-      debugPrint('[Main] Load tokens error: $e');
+      debugPrint('[Main] Push notifications init error: $e');
     }
+  }
 
-    // ── Push notifications (mobile only) ─────────────────
-    if (!kIsWeb) {
-      try {
-        await getIt<PushNotificationService>().initialize();
-      } catch (e) {
-        debugPrint('[Main] Push notifications init error: $e');
-      }
-    }
-
-    // ── Check auth state ─────────────────────────────────
-    getIt<AuthBloc>().add(const AuthCheckRequested());
-
-    runApp(const MyApp());
-  }, (error, stackTrace) {
-    debugPrint('[Main] Unhandled error: $error');
-    debugPrint('[Main] Stack trace: $stackTrace');
-  });
+  // ── Check auth state ─────────────────────────────────
+  getIt<AuthBloc>().add(const AuthCheckRequested());
 }
 
 class MyApp extends StatelessWidget {

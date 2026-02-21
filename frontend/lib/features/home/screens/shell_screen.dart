@@ -12,6 +12,13 @@ class ShellScreen extends StatelessWidget {
 
   const ShellScreen({super.key, required this.child});
 
+  // ── Guest navigation (unauthenticated) ──
+  static const _guestDestinations = <_NavItem>[
+    _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Inicio', path: '/home'),
+    _NavItem(icon: Icons.store_outlined, selectedIcon: Icons.store, label: 'Productos', path: '/products'),
+    _NavItem(icon: Icons.login, selectedIcon: Icons.login, label: 'Ingresar', path: '/login'),
+  ];
+
   // ── Client navigation ──
   static const _clientDestinations = <_NavItem>[
     _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Inicio', path: '/home'),
@@ -33,8 +40,14 @@ class ShellScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, authState) {
+        final isAuthenticated = authState is AuthAuthenticated;
         final isAdmin = _resolveIsAdmin(authState);
-        final destinations = isAdmin ? _adminDestinations : _clientDestinations;
+
+        final destinations = !isAuthenticated
+            ? _guestDestinations
+            : isAdmin
+                ? _adminDestinations
+                : _clientDestinations;
         final currentIndex = _calculateSelectedIndex(context, destinations);
 
         return Scaffold(

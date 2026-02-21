@@ -95,7 +95,23 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         ),
         body: RefreshIndicator(
           onRefresh: () async => _refresh(),
-          child: BlocBuilder<ProductsBloc, ProductsState>(
+          child: BlocConsumer<ProductsBloc, ProductsState>(
+            listener: (context, state) {
+              if (state is ProductActionSuccess) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(state.message)),
+                );
+                _refresh();
+              }
+              if (state is ProductsError) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(state.message),
+                    backgroundColor: AppTheme.errorColor,
+                  ),
+                );
+              }
+            },
             builder: (context, state) {
               if (state is ProductsLoading) return _buildLoadingShimmer();
               if (state is ProductsLoaded) {
@@ -150,9 +166,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     final stock = product['stock'] as int? ?? 0;
     final isActive = product['is_active'] as bool? ?? true;
     final isFeatured = product['is_featured'] as bool? ?? false;
-    final imageUrl = product['image_url'] as String? ??
-        product['images']?[0]?['url'] as String? ??
-        '';
+    final imageUrl = _extractFirstImage(product);
 
     return Dismissible(
       key: ValueKey(product['_id'] ?? product['id'] ?? name),
@@ -169,7 +183,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
       ),
       confirmDismiss: (_) => _confirmDelete(name),
       onDismissed: (_) {
-        // TODO: dispatch DeleteProduct event (soft delete)
+        final productId = (product['_id'] ?? product['id'] ?? '').toString();
+        _bloc.add(DeleteProduct(productId: productId));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$name eliminado')),
         );
@@ -398,12 +413,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
     final stockCtrl = TextEditingController(
         text: (product?['stock'] as int?)?.toString() ?? '0');
     final imageUrlCtrl =
-        TextEditingController(text: product?['image_url'] as String? ?? '');
+        TextEditingController(text: product != null ? _extractFirstImage(product) : '');
     final tagsCtrl = TextEditingController(
       text: (product?['tags'] as List?)?.join(', ') ?? '',
     );
     bool isFeatured = product?['is_featured'] as bool? ?? false;
-    String? selectedCategory = product?['category'] as String?;
+    String? selectedCategory = product?['category_id'] as String?;
 
     showModalBottomSheet(
       context: context,
@@ -570,18 +585,27 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: () {
-                            // TODO: Dispatch CreateProduct / UpdateProduct event
+                            if (nameCtrl.text.trim().isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('El nombre es obligatorio')),
+                              );
+                              return;
+                            }
+                            final imageUrl = imageUrlCtrl.text.trim();
                             final payload = <String, dynamic>{
                               'name': nameCtrl.text.trim(),
                               'description': descCtrl.text.trim(),
                               'short_description': shortDescCtrl.text.trim(),
                               'price': double.tryParse(priceCtrl.text) ?? 0,
                               'compare_price':
-                                  double.tryParse(comparePriceCtrl.text),
-                              'sku': skuCtrl.text.trim(),
+                                  double.tryParse(comparePriceCtrl.text) ?? 0,
+                              'sku': skuCtrl.text.trim().isEmpty
+                                  ? null
+                                  : skuCtrl.text.trim(),
                               'stock': int.tryParse(stockCtrl.text) ?? 0,
-                              'category': selectedCategory,
-                              'image_url': imageUrlCtrl.text.trim(),
+                              'category_id': selectedCategory,
+                              'images': imageUrl.isNotEmpty ? [imageUrl] : [],
                               'is_featured': isFeatured,
                               'tags': tagsCtrl.text
                                   .split(',')
@@ -589,17 +613,20 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
                                   .where((t) => t.isNotEmpty)
                                   .toList(),
                             };
-                            debugPrint(
-                                '[AdminProducts] ${isEditing ? "Update" : "Create"} payload: $payload');
+
+                            if (isEditing) {
+                              final productId = (product!['_id'] ??
+                                      product['id'] ??
+                                      '')
+                                  .toString();
+                              _bloc.add(UpdateProduct(
+                                productId: productId,
+                                payload: payload,
+                              ));
+                            } else {
+                              _bloc.add(CreateProduct(payload: payload));
+                            }
                             Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(isEditing
-                                    ? 'Producto actualizado'
-                                    : 'Producto creado'),
-                              ),
-                            );
-                            _refresh();
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryColor,
@@ -628,6 +655,19 @@ class _AdminProductsScreenState extends State<AdminProductsScreen> {
         );
       },
     );
+  }
+
+  /// Extract the first image URL from a product. Images may be a JSON array
+  /// of strings, a list of maps with `url` keys, or a bare `image_url` field.
+  String _extractFirstImage(Map<String, dynamic> product) {
+    // Try images array first
+    final images = product['images'];
+    if (images is List && images.isNotEmpty) {
+      final first = images.first;
+      if (first is String) return first;
+      if (first is Map) return (first['url'] ?? '').toString();
+    }
+    return (product['image_url'] ?? '').toString();
   }
 
   Widget _formField(

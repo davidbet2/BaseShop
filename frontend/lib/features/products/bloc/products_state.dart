@@ -58,3 +58,13 @@ class ProductsError extends ProductsState {
   @override
   List<Object?> get props => [message];
 }
+
+class ProductActionSuccess extends ProductsState {
+  final String message;
+  final Map<String, dynamic>? product;
+
+  const ProductActionSuccess({required this.message, this.product});
+
+  @override
+  List<Object?> get props => [message, product];
+}

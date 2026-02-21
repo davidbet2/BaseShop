@@ -13,6 +13,9 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
     on<LoadProducts>(_onLoadProducts);
     on<LoadProductDetail>(_onLoadProductDetail);
     on<LoadCategories>(_onLoadCategories);
+    on<CreateProduct>(_onCreateProduct);
+    on<UpdateProduct>(_onUpdateProduct);
+    on<DeleteProduct>(_onDeleteProduct);
   }
 
   Future<void> _onLoadProducts(
@@ -78,6 +81,54 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       emit(CategoriesLoaded(categories: categories));
     } catch (e) {
       debugPrint('[ProductsBloc] LoadCategories error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onCreateProduct(
+    CreateProduct event,
+    Emitter<ProductsState> emit,
+  ) async {
+    emit(const ProductsLoading());
+    try {
+      final product = await _repository.createProduct(event.payload);
+      emit(ProductActionSuccess(
+        message: 'Producto creado exitosamente',
+        product: product,
+      ));
+    } catch (e) {
+      debugPrint('[ProductsBloc] CreateProduct error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onUpdateProduct(
+    UpdateProduct event,
+    Emitter<ProductsState> emit,
+  ) async {
+    emit(const ProductsLoading());
+    try {
+      final product =
+          await _repository.updateProduct(event.productId, event.payload);
+      emit(ProductActionSuccess(
+        message: 'Producto actualizado exitosamente',
+        product: product,
+      ));
+    } catch (e) {
+      debugPrint('[ProductsBloc] UpdateProduct error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onDeleteProduct(
+    DeleteProduct event,
+    Emitter<ProductsState> emit,
+  ) async {
+    try {
+      await _repository.deleteProduct(event.productId);
+      emit(const ProductActionSuccess(message: 'Producto eliminado'));
+    } catch (e) {
+      debugPrint('[ProductsBloc] DeleteProduct error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
