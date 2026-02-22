@@ -25,7 +25,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   late final ProductsBloc _bloc;
   final _currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
-  final PageController _bannerCtrl = PageController();
+  final PageController _bannerCtrl = PageController(viewportFraction: 0.92);
   int _bannerPage = 0;
   Timer? _bannerTimer;
 
@@ -33,10 +33,10 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _bloc = getIt<ProductsBloc>()..add(const LoadProducts());
-    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+    _bannerTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (_bannerCtrl.hasClients) {
         final next = (_bannerPage + 1) % 3;
-        _bannerCtrl.animateToPage(next, duration: const Duration(milliseconds: 500), curve: Curves.easeInOut);
+        _bannerCtrl.animateToPage(next, duration: const Duration(milliseconds: 600), curve: Curves.easeInOut);
       }
     });
   }
@@ -83,7 +83,21 @@ class _HomeScreenState extends State<HomeScreen> {
       final pr = (p['price'] as num?)?.toDouble() ?? 0;
       return cp > pr && cp > 0;
     }).toList();
-    final newest = state.products.take(10).toList();
+    // Popular = featured + discounted, deduplicated, then fill with top products
+    final popularIds = <String>{};
+    final popular = <Map<String, dynamic>>[];
+    for (final p in [...featured, ...discounted]) {
+      final id = (p['_id'] ?? p['id'] ?? '').toString();
+      if (popularIds.add(id)) popular.add(p);
+    }
+    if (popular.length < 8) {
+      for (final p in state.products) {
+        final id = (p['_id'] ?? p['id'] ?? '').toString();
+        if (popularIds.add(id)) popular.add(p);
+        if (popular.length >= 12) break;
+      }
+    }
+
     final authState = context.watch<AuthBloc>().state;
     final firstName = authState is AuthAuthenticated
         ? (authState.user['firstName'] ?? authState.user['first_name'] ?? '').toString()
@@ -95,7 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SliverToBoxAdapter(
           child: Container(
             color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
             child: Row(
               children: [
                 Expanded(
@@ -103,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        firstName.isNotEmpty ? 'Hola, $firstName \u{1F44B}' : 'Descubre',
+                        firstName.isNotEmpty ? 'Hola, $firstName \u{1F44B}' : 'Bienvenido',
                         style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
                       ),
                       const SizedBox(height: 2),
@@ -124,146 +138,117 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
 
-        // ── Search bar ──
-        SliverToBoxAdapter(
-          child: GestureDetector(
-            onTap: () => context.go('/products'),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(20, 14, 20, 6),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(16)),
-              child: const Row(
-                children: [
-                  Icon(Icons.search_rounded, color: AppTheme.textSecondary, size: 22),
-                  SizedBox(width: 10),
-                  Text('Buscar productos, marcas...', style: TextStyle(color: AppTheme.textSecondary, fontSize: 15)),
-                ],
-              ),
-            ),
-          ),
-        ),
-
-        // ── Hero Banner Carousel (featured products with images) ──
+        // ── Hero Banner Carousel ──
         if (featured.isNotEmpty)
           SliverToBoxAdapter(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final screenW = constraints.maxWidth;
-                final bannerHeight = screenW > 900 ? 260.0 : screenW > 600 ? 220.0 : 200.0;
-                final bannerMaxWidth = screenW > 900 ? 900.0 : screenW;
-                final imgHeight = bannerHeight - 60;
+                final bannerH = screenW > 900 ? 240.0 : screenW > 600 ? 200.0 : 180.0;
+                final count = featured.length > 3 ? 3 : featured.length;
                 return Column(
                   children: [
-                    const SizedBox(height: 14),
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: bannerMaxWidth),
-                        child: SizedBox(
-                          height: bannerHeight,
-                          child: PageView.builder(
-                            controller: _bannerCtrl,
-                            onPageChanged: (i) => setState(() => _bannerPage = i),
-                            itemCount: featured.length > 3 ? 3 : featured.length,
-                            itemBuilder: (context, i) {
-                              final p = featured[i];
-                              final name = p['name']?.toString() ?? '';
-                              final shortDesc = (p['short_description'] ?? '').toString();
-                              final price = (p['price'] as num?)?.toDouble() ?? 0;
-                              final comparePrice = (p['compare_price'] as num?)?.toDouble() ?? 0;
-                              final images = p['images'] as List? ?? [];
-                              final imageUrl = images.isNotEmpty ? images.first.toString() : '';
-                              final hasDiscount = comparePrice > price && comparePrice > 0;
-                              final discountPct = hasDiscount ? ((comparePrice - price) / comparePrice * 100).round() : 0;
-                              final id = (p['_id'] ?? p['id'] ?? '').toString();
-                              final bannerColors = [
-                                [const Color(0xFFF97316), const Color(0xFFFB923C)],
-                                [const Color(0xFF6366F1), const Color(0xFF818CF8)],
-                                [const Color(0xFF059669), const Color(0xFF34D399)],
-                              ];
-                              final colors = bannerColors[i % bannerColors.length];
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      height: bannerH,
+                      child: PageView.builder(
+                        controller: _bannerCtrl,
+                        onPageChanged: (i) => setState(() => _bannerPage = i),
+                        itemCount: count,
+                        itemBuilder: (context, i) {
+                          final p = featured[i];
+                          final name = p['name']?.toString() ?? '';
+                          final price = (p['price'] as num?)?.toDouble() ?? 0;
+                          final comparePrice = (p['compare_price'] as num?)?.toDouble() ?? 0;
+                          final images = p['images'] as List? ?? [];
+                          final imageUrl = images.isNotEmpty ? images.first.toString() : '';
+                          final hasDiscount = comparePrice > price && comparePrice > 0;
+                          final discountPct = hasDiscount ? ((comparePrice - price) / comparePrice * 100).round() : 0;
+                          final id = (p['_id'] ?? p['id'] ?? '').toString();
+                          final gradients = [
+                            [const Color(0xFFF97316), const Color(0xFFFB923C)],
+                            [const Color(0xFF6366F1), const Color(0xFF818CF8)],
+                            [const Color(0xFF059669), const Color(0xFF34D399)],
+                          ];
+                          final g = gradients[i % gradients.length];
 
-                              return GestureDetector(
-                                onTap: () => context.push('/products/$id'),
-                                child: Container(
-                                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      // Decorative circles
-                                      Positioned(right: -20, top: -20, child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.1)))),
-                                      Positioned(right: 40, bottom: -30, child: Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)))),
-
-                                      Padding(
-                                        padding: const EdgeInsets.all(20),
-                                        child: Row(
-                                          children: [
-                                            // Text side
-                                            Expanded(
-                                              flex: 3,
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  if (hasDiscount)
-                                                    Container(
-                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(20)),
-                                                      child: Text('-$discountPct% OFF', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
-                                                    ),
-                                                  if (hasDiscount) const SizedBox(height: 8),
-                                                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
-                                                  const SizedBox(height: 4),
-                                                  if (shortDesc.isNotEmpty)
-                                                    Text(shortDesc, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
-                                                  const SizedBox(height: 10),
-                                                  Text(_currency.format(price), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
-                                                ],
+                          return GestureDetector(
+                            onTap: () => context.push('/products/$id'),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(colors: g, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                                borderRadius: BorderRadius.circular(22),
+                                boxShadow: [BoxShadow(color: g[0].withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 6))],
+                              ),
+                              child: Stack(
+                                children: [
+                                  Positioned(right: -20, top: -20, child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)))),
+                                  Positioned(left: -10, bottom: -30, child: Container(width: 70, height: 70, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.06)))),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          flex: 3,
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              if (hasDiscount)
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                                                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20)),
+                                                  child: Text('-$discountPct% OFF', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                                                ),
+                                              if (hasDiscount) const SizedBox(height: 6),
+                                              Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
+                                              const SizedBox(height: 8),
+                                              Text(_currency.format(price), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
+                                              const SizedBox(height: 10),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                                                child: Text('Ver producto', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: g[0])),
                                               ),
-                                            ),
-                                            const SizedBox(width: 12),
-                                            // Product image
-                                            Expanded(
-                                              flex: 2,
-                                              child: ClipRRect(
-                                                borderRadius: BorderRadius.circular(16),
-                                                child: imageUrl.isNotEmpty
-                                                  ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover, height: imgHeight,
-                                                      placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.2)),
-                                                      errorWidget: (_, __, ___) => Container(
-                                                        color: Colors.white.withValues(alpha: 0.2),
-                                                        child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
-                                                      ))
-                                                  : Container(
-                                                      height: imgHeight,
-                                                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)),
-                                                      child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
-                                                    ),
-                                              ),
-                                            ),
-                                          ],
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          flex: 2,
+                                          child: ClipRRect(
+                                            borderRadius: BorderRadius.circular(16),
+                                            child: imageUrl.isNotEmpty
+                                              ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover, height: bannerH - 40,
+                                                  placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.2)),
+                                                  errorWidget: (_, __, ___) => Container(
+                                                    color: Colors.white.withValues(alpha: 0.2),
+                                                    child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
+                                                  ))
+                                              : Container(
+                                                  height: bannerH - 40,
+                                                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)),
+                                                  child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ),
-                    // Page indicators
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        featured.length > 3 ? 3 : featured.length,
-                        (i) => AnimatedContainer(
+                      children: List.generate(count, (i) =>
+                        AnimatedContainer(
                           duration: const Duration(milliseconds: 300),
                           width: i == _bannerPage ? 24 : 8,
                           height: 8,
@@ -281,58 +266,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-        // ── Categories ──
-        if (state.categories.isNotEmpty) ...[
-          _sectionHeader('Categor\u00edas', onSeeAll: () => context.go('/products')),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 100,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: state.categories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemBuilder: (context, index) {
-                  final cat = state.categories[index];
-                  final catName = cat['name']?.toString() ?? '';
-                  final catId = cat['id']?.toString() ?? '';
-                  final icons = [Icons.devices_rounded, Icons.checkroom_rounded, Icons.home_rounded, Icons.sports_soccer_rounded, Icons.spa_rounded];
-                  final colors = [const Color(0xFFEEF2FF), const Color(0xFFFEF2F2), const Color(0xFFF0FDF4), const Color(0xFFFFF7ED), const Color(0xFFFDF2F8)];
-                  final iconColors = [const Color(0xFF6366F1), const Color(0xFFEF4444), const Color(0xFF22C55E), const Color(0xFFF97316), const Color(0xFFEC4899)];
-                  return GestureDetector(
-                    onTap: () => context.go('/products'),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 60, height: 60,
-                          decoration: BoxDecoration(color: colors[index % colors.length], borderRadius: BorderRadius.circular(18)),
-                          child: Icon(icons[index % icons.length], color: iconColors[index % iconColors.length], size: 26),
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: 68,
-                          child: Text(catName, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-
-        // ── Flash Deals (discounted products) ──
+        // ── Ofertas (horizontal scroll) ──
         if (discounted.isNotEmpty) ...[
-          _sectionHeader('\u{26A1} Ofertas del d\u00eda', onSeeAll: () => context.go('/products')),
+          _sectionHeader('\u{1F525} Ofertas', onSeeAll: () => context.go('/products')),
           SliverToBoxAdapter(
             child: SizedBox(
               height: 260,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: discounted.length > 10 ? 10 : discounted.length,
+                itemCount: discounted.length > 8 ? 8 : discounted.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 14),
                 itemBuilder: (_, i) => _ProductCard(product: discounted[i], currency: _currency, showBadge: true),
               ),
@@ -340,41 +283,22 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
 
-        // ── Featured ──
-        if (featured.isNotEmpty) ...[
-          _sectionHeader('Productos estrella', onSeeAll: () => context.go('/products')),
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 260,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: featured.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 14),
-                itemBuilder: (_, i) => _ProductCard(product: featured[i], currency: _currency),
-              ),
+        // ── Popular products (responsive grid) ──
+        _sectionHeader('Populares', onSeeAll: () => context.go('/products')),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          sliver: SliverGrid(
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 220, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.63,
+            ),
+            delegate: SliverChildBuilderDelegate(
+              (_, i) => _ProductCard(product: popular[i], currency: _currency, isGrid: true),
+              childCount: popular.length > 12 ? 12 : popular.length,
             ),
           ),
-        ],
+        ),
 
-        // ── New products grid ──
-        if (newest.isNotEmpty) ...[
-          _sectionHeader('Reci\u00e9n llegados', onSeeAll: () => context.go('/products')),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverGrid(
-              gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 220, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.63,
-              ),
-              delegate: SliverChildBuilderDelegate(
-                (_, i) => _ProductCard(product: newest[i], currency: _currency, isGrid: true),
-                childCount: newest.length > 6 ? 6 : newest.length,
-              ),
-            ),
-          ),
-        ],
-
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
       ],
     );
   }
@@ -410,16 +334,15 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Container(height: 40, width: 180, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8))),
           const SizedBox(height: 16),
-          Container(height: 48, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16))),
-          const SizedBox(height: 16),
-          Container(height: 200, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20))),
-          const SizedBox(height: 20),
-          Row(children: List.generate(4, (_) => Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Column(children: [
-              Container(width: 60, height: 60, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18))),
-              const SizedBox(height: 8), Container(width: 50, height: 12, color: Colors.white),
-            ]),
+          Container(height: 180, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(22))),
+          const SizedBox(height: 24),
+          Container(height: 20, width: 120, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6))),
+          const SizedBox(height: 12),
+          Row(children: List.generate(2, (_) => Expanded(
+            child: Container(
+              height: 200, margin: const EdgeInsets.only(right: 12),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+            ),
           ))),
         ],
       ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:baseshop/core/theme/app_theme.dart';
 import 'package:baseshop/features/products/bloc/products_bloc.dart';
@@ -730,21 +731,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   void _shareProduct(String name, double price) {
     final url = 'https://baseshop.app/products/${widget.productId}';
-    final text = '$name - ${_currency.format(price)}\n$url';
-    Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Row(children: [
-          Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-          SizedBox(width: 8),
-          Text('Enlace copiado al portapapeles'),
-        ]),
-        backgroundColor: AppTheme.successColor,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-      ),
-    );
+    final text = '¡Mira esto en BaseShop!\n\n$name\n${_currency.format(price)}\n\n$url';
+    Share.share(text, subject: name);
   }
 
   List<String> _getSizeOptions(_VariantType type) {

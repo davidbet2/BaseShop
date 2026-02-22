@@ -111,16 +111,7 @@ class _CartScreenState extends State<CartScreen> {
                       SizedBox(
                         width: double.infinity, height: 56,
                         child: ElevatedButton.icon(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Funci\u00f3n de pago pr\u00f3ximamente'),
-                                backgroundColor: AppTheme.primaryColor,
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            );
-                          },
+                          onPressed: () => context.push('/checkout'),
                           icon: const Icon(Icons.payment_rounded, size: 20),
                           label: const Text('Proceder al pago', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                         ),

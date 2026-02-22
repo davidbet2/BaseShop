@@ -82,8 +82,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       },
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 220,
           childAspectRatio: 0.68,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
@@ -268,8 +268,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       highlightColor: Colors.grey.shade100,
       child: GridView.builder(
         padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 220,
           childAspectRatio: 0.68,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,

@@ -130,7 +130,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text('Explorar', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                    Text('Tienda', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
                     SizedBox(height: 2),
                     Text('Encuentra lo que necesitas', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
                   ],

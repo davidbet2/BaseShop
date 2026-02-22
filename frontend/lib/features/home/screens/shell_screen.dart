@@ -14,13 +14,13 @@ class ShellScreen extends StatelessWidget {
 
   static const _guestDestinations = <_NavItem>[
     _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Inicio', path: '/home'),
-    _NavItem(icon: Icons.search_outlined, selectedIcon: Icons.search_rounded, label: 'Explorar', path: '/products'),
+    _NavItem(icon: Icons.storefront_outlined, selectedIcon: Icons.storefront_rounded, label: 'Tienda', path: '/products'),
     _NavItem(icon: Icons.login_rounded, selectedIcon: Icons.login_rounded, label: 'Ingresar', path: '/login'),
   ];
 
   static const _clientDestinations = <_NavItem>[
     _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Inicio', path: '/home'),
-    _NavItem(icon: Icons.search_outlined, selectedIcon: Icons.search_rounded, label: 'Explorar', path: '/products'),
+    _NavItem(icon: Icons.storefront_outlined, selectedIcon: Icons.storefront_rounded, label: 'Tienda', path: '/products'),
     _NavItem(icon: Icons.shopping_bag_outlined, selectedIcon: Icons.shopping_bag_rounded, label: 'Carrito', path: '/cart'),
     _NavItem(icon: Icons.receipt_outlined, selectedIcon: Icons.receipt_rounded, label: 'Pedidos', path: '/orders'),
     _NavItem(icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Perfil', path: '/profile'),

@@ -9,6 +9,7 @@ import 'package:baseshop/core/router/not_found_screen.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
 import 'package:baseshop/features/products/bloc/products_bloc.dart';
+import 'package:baseshop/features/reviews/bloc/reviews_bloc.dart';
 
 import 'package:baseshop/features/auth/screens/login_screen.dart';
 import 'package:baseshop/features/auth/screens/register_screen.dart';
@@ -20,6 +21,9 @@ import 'package:baseshop/features/orders/screens/orders_screen.dart';
 import 'package:baseshop/features/orders/screens/order_detail_screen.dart';
 import 'package:baseshop/features/favorites/screens/favorites_screen.dart';
 import 'package:baseshop/features/profile/screens/profile_screen.dart';
+import 'package:baseshop/features/profile/screens/addresses_screen.dart';
+import 'package:baseshop/features/reviews/screens/my_reviews_screen.dart';
+import 'package:baseshop/features/checkout/screens/checkout_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_products_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_orders_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_dashboard_screen.dart';
@@ -31,6 +35,9 @@ const _authRequiredPaths = <String>{
   '/orders',
   '/favorites',
   '/profile',
+  '/checkout',
+  '/addresses',
+  '/my-reviews',
   '/admin/dashboard',
   '/admin/products',
   '/admin/orders',
@@ -195,6 +202,21 @@ final GoRouter appRouter = GoRouter(
         final orderId = state.pathParameters['id']!;
         return OrderDetailScreen(orderId: orderId);
       },
+    ),
+    GoRoute(
+      path: '/checkout',
+      builder: (context, state) => const CheckoutScreen(),
+    ),
+    GoRoute(
+      path: '/addresses',
+      builder: (context, state) => const AddressesScreen(),
+    ),
+    GoRoute(
+      path: '/my-reviews',
+      builder: (context, state) => BlocProvider(
+        create: (_) => ReviewsBloc(getIt()),
+        child: const MyReviewsScreen(),
+      ),
     ),
   ],
 );
