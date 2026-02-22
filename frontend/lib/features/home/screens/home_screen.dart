@@ -146,125 +146,138 @@ class _HomeScreenState extends State<HomeScreen> {
         // ── Hero Banner Carousel (featured products with images) ──
         if (featured.isNotEmpty)
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                const SizedBox(height: 14),
-                SizedBox(
-                  height: 200,
-                  child: PageView.builder(
-                    controller: _bannerCtrl,
-                    onPageChanged: (i) => setState(() => _bannerPage = i),
-                    itemCount: featured.length > 3 ? 3 : featured.length,
-                    itemBuilder: (context, i) {
-                      final p = featured[i];
-                      final name = p['name']?.toString() ?? '';
-                      final shortDesc = (p['short_description'] ?? '').toString();
-                      final price = (p['price'] as num?)?.toDouble() ?? 0;
-                      final comparePrice = (p['compare_price'] as num?)?.toDouble() ?? 0;
-                      final images = p['images'] as List? ?? [];
-                      final imageUrl = images.isNotEmpty ? images.first.toString() : '';
-                      final hasDiscount = comparePrice > price && comparePrice > 0;
-                      final discountPct = hasDiscount ? ((comparePrice - price) / comparePrice * 100).round() : 0;
-                      final id = (p['_id'] ?? p['id'] ?? '').toString();
-                      final bannerColors = [
-                        [const Color(0xFFF97316), const Color(0xFFFB923C)],
-                        [const Color(0xFF6366F1), const Color(0xFF818CF8)],
-                        [const Color(0xFF059669), const Color(0xFF34D399)],
-                      ];
-                      final colors = bannerColors[i % bannerColors.length];
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final screenW = constraints.maxWidth;
+                final bannerHeight = screenW > 900 ? 260.0 : screenW > 600 ? 220.0 : 200.0;
+                final bannerMaxWidth = screenW > 900 ? 900.0 : screenW;
+                final imgHeight = bannerHeight - 60;
+                return Column(
+                  children: [
+                    const SizedBox(height: 14),
+                    Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: bannerMaxWidth),
+                        child: SizedBox(
+                          height: bannerHeight,
+                          child: PageView.builder(
+                            controller: _bannerCtrl,
+                            onPageChanged: (i) => setState(() => _bannerPage = i),
+                            itemCount: featured.length > 3 ? 3 : featured.length,
+                            itemBuilder: (context, i) {
+                              final p = featured[i];
+                              final name = p['name']?.toString() ?? '';
+                              final shortDesc = (p['short_description'] ?? '').toString();
+                              final price = (p['price'] as num?)?.toDouble() ?? 0;
+                              final comparePrice = (p['compare_price'] as num?)?.toDouble() ?? 0;
+                              final images = p['images'] as List? ?? [];
+                              final imageUrl = images.isNotEmpty ? images.first.toString() : '';
+                              final hasDiscount = comparePrice > price && comparePrice > 0;
+                              final discountPct = hasDiscount ? ((comparePrice - price) / comparePrice * 100).round() : 0;
+                              final id = (p['_id'] ?? p['id'] ?? '').toString();
+                              final bannerColors = [
+                                [const Color(0xFFF97316), const Color(0xFFFB923C)],
+                                [const Color(0xFF6366F1), const Color(0xFF818CF8)],
+                                [const Color(0xFF059669), const Color(0xFF34D399)],
+                              ];
+                              final colors = bannerColors[i % bannerColors.length];
 
-                      return GestureDetector(
-                        onTap: () => context.push('/products/$id'),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Stack(
-                            children: [
-                              // Decorative circles
-                              Positioned(right: -20, top: -20, child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.1)))),
-                              Positioned(right: 40, bottom: -30, child: Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)))),
+                              return GestureDetector(
+                                onTap: () => context.push('/products/$id'),
+                                child: Container(
+                                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      // Decorative circles
+                                      Positioned(right: -20, top: -20, child: Container(width: 100, height: 100, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.1)))),
+                                      Positioned(right: 40, bottom: -30, child: Container(width: 80, height: 80, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withValues(alpha: 0.08)))),
 
-                              Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Row(
-                                  children: [
-                                    // Text side
-                                    Expanded(
-                                      flex: 3,
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          if (hasDiscount)
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(20)),
-                                              child: Text('-$discountPct% OFF', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                                      Padding(
+                                        padding: const EdgeInsets.all(20),
+                                        child: Row(
+                                          children: [
+                                            // Text side
+                                            Expanded(
+                                              flex: 3,
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  if (hasDiscount)
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.25), borderRadius: BorderRadius.circular(20)),
+                                                      child: Text('-$discountPct% OFF', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                                                    ),
+                                                  if (hasDiscount) const SizedBox(height: 8),
+                                                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
+                                                  const SizedBox(height: 4),
+                                                  if (shortDesc.isNotEmpty)
+                                                    Text(shortDesc, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
+                                                  const SizedBox(height: 10),
+                                                  Text(_currency.format(price), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
+                                                ],
+                                              ),
                                             ),
-                                          if (hasDiscount) const SizedBox(height: 8),
-                                          Text(name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white, height: 1.2)),
-                                          const SizedBox(height: 4),
-                                          if (shortDesc.isNotEmpty)
-                                            Text(shortDesc, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.85))),
-                                          const SizedBox(height: 10),
-                                          Text(_currency.format(price), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // Product image
-                                    Expanded(
-                                      flex: 2,
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: imageUrl.isNotEmpty
-                                          ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover, height: 140,
-                                              placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.2)),
-                                              errorWidget: (_, __, ___) => Container(
-                                                color: Colors.white.withValues(alpha: 0.2),
-                                                child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
-                                              ))
-                                          : Container(
-                                              height: 140,
-                                              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)),
-                                              child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
+                                            const SizedBox(width: 12),
+                                            // Product image
+                                            Expanded(
+                                              flex: 2,
+                                              child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(16),
+                                                child: imageUrl.isNotEmpty
+                                                  ? CachedNetworkImage(imageUrl: imageUrl, fit: BoxFit.cover, height: imgHeight,
+                                                      placeholder: (_, __) => Container(color: Colors.white.withValues(alpha: 0.2)),
+                                                      errorWidget: (_, __, ___) => Container(
+                                                        color: Colors.white.withValues(alpha: 0.2),
+                                                        child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
+                                                      ))
+                                                  : Container(
+                                                      height: imgHeight,
+                                                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(16)),
+                                                      child: const Icon(Icons.shopping_bag_outlined, size: 40, color: Colors.white),
+                                                    ),
+                                              ),
                                             ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                // Page indicators
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    featured.length > 3 ? 3 : featured.length,
-                    (i) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      width: i == _bannerPage ? 24 : 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        color: i == _bannerPage ? AppTheme.primaryColor : const Color(0xFFD1D5DB),
-                        borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                    // Page indicators
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(
+                        featured.length > 3 ? 3 : featured.length,
+                        (i) => AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: i == _bannerPage ? 24 : 8,
+                          height: 8,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: i == _bannerPage ? AppTheme.primaryColor : const Color(0xFFD1D5DB),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
 
