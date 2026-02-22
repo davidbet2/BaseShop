@@ -33,10 +33,10 @@ class FavoritesRepository {
     final response = await _apiClient.dio.post(
       ApiConstants.favorites,
       data: {
-        'productId': productId,
-        'productName': productName,
-        'productPrice': productPrice,
-        'productImage': productImage,
+        'product_id': productId,
+        'product_name': productName,
+        'product_price': productPrice,
+        'product_image': productImage,
       },
     );
     return Map<String, dynamic>.from(response.data ?? {});
@@ -51,7 +51,7 @@ class FavoritesRepository {
   Future<bool> checkFavorite(String productId) async {
     try {
       final response = await _apiClient.dio.get(
-        '${ApiConstants.favorites}/$productId/check',
+        '${ApiConstants.favorites}/check/$productId',
       );
       final data = response.data;
       if (data is Map<String, dynamic>) {

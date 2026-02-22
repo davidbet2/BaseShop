@@ -207,9 +207,7 @@ class _CartScreenState extends State<CartScreen> {
                     width: 36, height: 36,
                     child: IconButton(
                       onPressed: () {
-                        if (quantity > 1) {
-                          context.read<CartBloc>().add(UpdateCartItem(itemId: itemId, quantity: quantity + 1));
-                        }
+                        context.read<CartBloc>().add(UpdateCartItem(itemId: itemId, quantity: quantity + 1));
                       },
                       icon: const Icon(Icons.add_rounded, size: 16),
                       padding: EdgeInsets.zero,

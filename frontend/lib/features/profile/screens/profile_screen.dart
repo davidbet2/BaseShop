@@ -209,6 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textSecondary, letterSpacing: 0.5)),
           ),
           ...items,
+          const SizedBox(height: 8),
         ],
       ),
     );

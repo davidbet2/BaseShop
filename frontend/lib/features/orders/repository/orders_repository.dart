@@ -55,10 +55,10 @@ class OrdersRepository {
   }) async {
     final body = <String, dynamic>{
       'items': items,
-      'shippingAddress': shippingAddress,
-      'paymentMethod': paymentMethod,
+      'shipping_address': shippingAddress,
+      'payment_method': paymentMethod,
     };
-    if (billingAddress != null) body['billingAddress'] = billingAddress;
+    if (billingAddress != null) body['billing_address'] = billingAddress;
     if (notes != null && notes.isNotEmpty) body['notes'] = notes;
 
     final response = await _apiClient.dio.post(

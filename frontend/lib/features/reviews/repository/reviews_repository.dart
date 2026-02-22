@@ -54,7 +54,7 @@ class ReviewsRepository {
     final response = await _apiClient.dio.post(
       ApiConstants.reviews,
       data: {
-        'productId': productId,
+        'product_id': productId,
         'rating': rating,
         'title': title,
         'comment': comment,

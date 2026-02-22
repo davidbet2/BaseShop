@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -79,13 +81,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: BlocBuilder<ProductsBloc, ProductsState>(
-        buildWhen: (_, curr) => curr is ProductDetailLoaded || curr is ProductsLoading || curr is ProductsError,
-        builder: (context, state) {
-          if (state is ProductsLoading) return _buildLoading();
-          if (state is ProductsError) return _buildError(state.message);
-          if (state is! ProductDetailLoaded) return _buildLoading();
+      backgroundColor: kIsWeb ? const Color(0xFFF0F1F3) : Colors.white,
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Container(
+            color: Colors.white,
+            child: BlocBuilder<ProductsBloc, ProductsState>(
+              buildWhen: (_, curr) => curr is ProductDetailLoaded || curr is ProductsLoading || curr is ProductsError,
+              builder: (context, state) {
+                if (state is ProductsLoading) return _buildLoading();
+                if (state is ProductsError) return _buildError(state.message);
+                if (state is! ProductDetailLoaded) return _buildLoading();
 
           final p = state.product;
           // Fix field mapping: backend uses `images` (array) and `compare_price`
@@ -139,7 +146,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.all(8),
                         child: GestureDetector(
-                          onTap: () {},
+                          onTap: () => _shareProduct(name, price),
                           child: Container(
                             width: 40, height: 40,
                             decoration: BoxDecoration(
@@ -518,6 +525,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ],
           );
         },
+      ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _shareProduct(String name, double price) {
+    final url = 'https://baseshop.app/products/${widget.productId}';
+    final text = '$name - ${_currency.format(price)}\n$url';
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Row(children: [
+          Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+          SizedBox(width: 8),
+          Text('Enlace copiado al portapapeles'),
+        ]),
+        backgroundColor: AppTheme.successColor,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       ),
     );
   }

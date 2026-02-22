@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -48,7 +49,13 @@ class ShellScreen extends StatelessWidget {
         final currentIndex = _calculateSelectedIndex(context, destinations);
 
         return Scaffold(
-          body: child,
+          backgroundColor: kIsWeb ? const Color(0xFFF0F1F3) : null,
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: child,
+            ),
+          ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               color: AppTheme.surfaceColor,
