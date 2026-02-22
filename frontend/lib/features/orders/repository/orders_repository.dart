@@ -33,10 +33,10 @@ class OrdersRepository {
     };
   }
 
-  /// Fetch a single order by ID.
+  /// Fetch a single order by ID (current user's order).
   Future<Map<String, dynamic>> getOrderDetail(String orderId) async {
     final response = await _apiClient.dio.get(
-      '${ApiConstants.orders}/$orderId',
+      '${ApiConstants.myOrders}/$orderId',
     );
     final data = response.data;
     if (data is Map<String, dynamic> && data.containsKey('data')) {
