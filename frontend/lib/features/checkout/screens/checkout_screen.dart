@@ -493,12 +493,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     final address = _addresses[_selectedAddressIndex];
     final orderItems = items.map((item) {
       final productId = (item['product_id'] ?? item['productId'] ?? '').toString();
+      final productName = (item['product_name'] ?? item['productName'] ?? item['name'] ?? '').toString();
       final qty = int.tryParse(item['quantity']?.toString() ?? '1') ?? 1;
       final price = double.tryParse(item['product_price']?.toString() ?? item['price']?.toString() ?? '0') ?? 0;
+      final image = (item['product_image'] ?? item['productImage'] ?? item['image'] ?? '').toString();
       return {
         'product_id': productId,
+        'product_name': productName,
+        'product_image': image,
         'quantity': qty,
-        'price': price,
+        'product_price': price,
       };
     }).toList();
 

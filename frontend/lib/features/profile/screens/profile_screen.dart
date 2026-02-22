@@ -105,9 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Features section (non-admin only)
                   if (role != 'admin') ...[
                     _buildSection('Mis actividades', [
-                      _buildMenuItem(Icons.favorite_border_rounded, 'Favoritos', () => context.push('/favorites')),
                       _buildMenuItem(Icons.receipt_long_rounded, 'Mis pedidos', () => context.go('/orders')),
-                      _buildMenuItem(Icons.star_border_rounded, 'Mis reseñas', () => context.push('/my-reviews')),
                       _buildMenuItem(Icons.location_on_outlined, 'Mis direcciones', () => context.push('/addresses')),
                     ]),
                     const SizedBox(height: 14),
