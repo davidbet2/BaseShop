@@ -139,10 +139,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
               if (!isWide)
                 GestureDetector(
                   onTap: _showFilterSheet,
-                  child: Container(
-                    width: 42, height: 42,
-                    decoration: BoxDecoration(color: AppTheme.primaryColor, borderRadius: BorderRadius.circular(12)),
-                    child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 42, height: 42,
+                        decoration: BoxDecoration(color: AppTheme.primaryColor, borderRadius: BorderRadius.circular(12)),
+                        child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+                      ),
+                      if (_activeFilterCount > 0)
+                        Positioned(
+                          top: -4, right: -4,
+                          child: Container(
+                            width: 20, height: 20,
+                            decoration: const BoxDecoration(color: AppTheme.errorColor, shape: BoxShape.circle),
+                            child: Center(child: Text('$_activeFilterCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
             ],
@@ -543,8 +557,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
     );
   }
 
+  int get _activeFilterCount {
+    int count = 0;
+    if (_selectedCategoryId != null) count++;
+    if (_sortBy != 'newest') count++;
+    if (_minPrice != null) count++;
+    if (_maxPrice != null) count++;
+    return count;
+  }
+
   void _showFilterSheet() {
     String tempSort = _sortBy;
+    String? tempCategory = _selectedCategoryId;
     final minCtrl = TextEditingController(text: _minPrice?.toStringAsFixed(0) ?? '');
     final maxCtrl = TextEditingController(text: _maxPrice?.toStringAsFixed(0) ?? '');
 
@@ -555,85 +579,180 @@ class _ProductsScreenState extends State<ProductsScreen> {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         return StatefulBuilder(builder: (ctx, setSheetState) {
-          return Padding(
-            padding: EdgeInsets.fromLTRB(24, 20, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
-                const SizedBox(height: 20),
-                const Text('Filtrar y ordenar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                const SizedBox(height: 20),
-                const Text('Ordenar por', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    _sortChip('newest', 'M\u00e1s nuevos', tempSort, (v) => setSheetState(() => tempSort = v)),
-                    _sortChip('price_asc', 'Menor precio', tempSort, (v) => setSheetState(() => tempSort = v)),
-                    _sortChip('price_desc', 'Mayor precio', tempSort, (v) => setSheetState(() => tempSort = v)),
-                    _sortChip('name_asc', 'A - Z', tempSort, (v) => setSheetState(() => tempSort = v)),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                const Text('Rango de precio', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                const SizedBox(height: 10),
-                Row(children: [
-                  Expanded(child: TextField(controller: minCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Min'))),
-                  const Padding(padding: EdgeInsets.symmetric(horizontal: 12), child: Text('-', style: TextStyle(fontSize: 18))),
-                  Expanded(child: TextField(controller: maxCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(hintText: 'Max'))),
-                ]),
-                const SizedBox(height: 24),
-                Row(children: [
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.75,
+            minChildSize: 0.4,
+            maxChildSize: 0.9,
+            builder: (_, scrollCtrl) {
+              return Column(
+                children: [
+                  // Handle + header
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                    child: Column(
+                      children: [
+                        Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            const Expanded(child: Text('Filtros', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.textPrimary))),
+                            TextButton(
+                              onPressed: () {
+                                setSheetState(() { tempSort = 'newest'; tempCategory = null; minCtrl.clear(); maxCtrl.clear(); });
+                              },
+                              child: const Text('Limpiar todo', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  // Scrollable filter content
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        setState(() { _sortBy = 'newest'; _minPrice = null; _maxPrice = null; });
-                        _loadProducts(reset: true);
-                      },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.textSecondary,
-                        side: const BorderSide(color: AppTheme.dividerColor),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                    child: ListView(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+                      children: [
+                        // ── Categories ──
+                        const Text('Categor\u00eda', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8, runSpacing: 8,
+                          children: [
+                            _filterCategoryChip(null, 'Todos', tempCategory, (v) => setSheetState(() => tempCategory = v)),
+                            ..._categories.map((c) => _filterCategoryChip(
+                              c['id']?.toString() ?? '', c['name']?.toString() ?? '',
+                              tempCategory, (v) => setSheetState(() => tempCategory = v),
+                            )),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        // ── Sort ──
+                        const Text('Ordenar por', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 12),
+                        _sheetSortOption('newest', 'M\u00e1s nuevos', Icons.schedule_rounded, tempSort, (v) => setSheetState(() => tempSort = v)),
+                        _sheetSortOption('price_asc', 'Menor precio', Icons.arrow_downward_rounded, tempSort, (v) => setSheetState(() => tempSort = v)),
+                        _sheetSortOption('price_desc', 'Mayor precio', Icons.arrow_upward_rounded, tempSort, (v) => setSheetState(() => tempSort = v)),
+                        _sheetSortOption('name_asc', 'A - Z', Icons.sort_by_alpha_rounded, tempSort, (v) => setSheetState(() => tempSort = v)),
+                        const SizedBox(height: 24),
+                        // ── Price Range ──
+                        const Text('Rango de precio', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                        const SizedBox(height: 12),
+                        Row(children: [
+                          Expanded(
+                            child: TextField(
+                              controller: minCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                hintText: 'M\u00ednimo',
+                                prefixText: '\$ ',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.dividerColor)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.dividerColor)),
+                              ),
+                            ),
+                          ),
+                          const Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text('\u2013', style: TextStyle(fontSize: 18, color: AppTheme.textSecondary))),
+                          Expanded(
+                            child: TextField(
+                              controller: maxCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                hintText: 'M\u00e1ximo',
+                                prefixText: '\$ ',
+                                isDense: true,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.dividerColor)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppTheme.dividerColor)),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      ],
+                    ),
+                  ),
+                  // ── Apply button ──
+                  Container(
+                    padding: EdgeInsets.fromLTRB(24, 12, 24, MediaQuery.of(ctx).padding.bottom + 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border(top: BorderSide(color: AppTheme.dividerColor.withValues(alpha: 0.5))),
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          setState(() {
+                            _sortBy = tempSort;
+                            _selectedCategoryId = tempCategory;
+                            _minPrice = double.tryParse(minCtrl.text);
+                            _maxPrice = double.tryParse(maxCtrl.text);
+                          });
+                          _loadProducts(reset: true);
+                        },
+                        style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                        child: const Text('Aplicar filtros', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
-                      child: const Text('Limpiar'),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        setState(() { _sortBy = tempSort; _minPrice = double.tryParse(minCtrl.text); _maxPrice = double.tryParse(maxCtrl.text); });
-                        _loadProducts(reset: true);
-                      },
-                      style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 14)),
-                      child: const Text('Aplicar'),
-                    ),
-                  ),
-                ]),
-              ],
-            ),
+                ],
+              );
+            },
           );
         });
       },
     );
   }
 
-  Widget _sortChip(String value, String label, String current, ValueChanged<String> onTap) {
-    final selected = current == value;
-    return ChoiceChip(
-      label: Text(label),
-      selected: selected,
-      selectedColor: AppTheme.primaryColor,
-      backgroundColor: const Color(0xFFF3F4F6),
-      labelStyle: TextStyle(color: selected ? Colors.white : AppTheme.textSecondary, fontWeight: FontWeight.w600, fontSize: 13),
-      side: BorderSide.none,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      onSelected: (_) => onTap(value),
+  Widget _filterCategoryChip(String? id, String label, String? current, ValueChanged<String?> onTap) {
+    final selected = current == id;
+    return GestureDetector(
+      onTap: () => onTap(id),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primaryColor : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppTheme.primaryColor : AppTheme.dividerColor),
+        ),
+        child: Text(label, style: TextStyle(
+          fontSize: 13, fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : AppTheme.textPrimary,
+        )),
+      ),
     );
   }
+
+  Widget _sheetSortOption(String value, String label, IconData icon, String current, ValueChanged<String> onTap) {
+    final selected = current == value;
+    return GestureDetector(
+      onTap: () => onTap(value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.08) : null,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary),
+            const SizedBox(width: 12),
+            Expanded(child: Text(label, style: TextStyle(
+              fontSize: 14, fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected ? AppTheme.primaryColor : AppTheme.textPrimary,
+            ))),
+            if (selected) const Icon(Icons.check_rounded, size: 20, color: AppTheme.primaryColor),
+          ],
+        ),
+      ),
+    );
+  }
+
 }
