@@ -30,6 +30,7 @@ class ShellScreen extends StatelessWidget {
     _NavItem(icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard_rounded, label: 'Panel', path: '/admin/dashboard'),
     _NavItem(icon: Icons.inventory_2_outlined, selectedIcon: Icons.inventory_2_rounded, label: 'Productos', path: '/admin/products'),
     _NavItem(icon: Icons.receipt_outlined, selectedIcon: Icons.receipt_rounded, label: 'Pedidos', path: '/admin/orders'),
+    _NavItem(icon: Icons.settings_outlined, selectedIcon: Icons.settings_rounded, label: 'Config', path: '/admin/config'),
     _NavItem(icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Perfil', path: '/profile'),
   ];
 

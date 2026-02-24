@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 
@@ -9,10 +10,7 @@ import 'package:baseshop/features/orders/bloc/orders_bloc.dart';
 import 'package:baseshop/features/orders/bloc/orders_event.dart';
 import 'package:baseshop/features/orders/bloc/orders_state.dart';
 
-/// Admin Orders Management Screen.
-///
-/// Displays all orders with status filter chips, search, status‑update
-/// dialogs, and quick‑action buttons based on current order status.
+/// Admin Orders Management Screen – uses admin /orders endpoint.
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
 
@@ -22,18 +20,15 @@ class AdminOrdersScreen extends StatefulWidget {
 
 class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   late final OrdersBloc _bloc;
-  final _searchController = TextEditingController();
+  final _searchCtrl = TextEditingController();
   String? _selectedStatus;
-  int _currentPage = 1;
-  final _scrollController = ScrollController();
+  int _page = 1;
 
-  final _currencyFormat = NumberFormat.currency(
+  final _currencyFmt = NumberFormat.currency(
     locale: 'es_CO',
     symbol: '\$',
     decimalDigits: 0,
   );
-
-  // ── Status maps ─────────────────────────────────────────────────────
 
   static const _statusFilters = <String, String>{
     'all': 'Todos',
@@ -52,6 +47,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     'shipped': 'Enviado',
     'delivered': 'Entregado',
     'cancelled': 'Cancelado',
+    'refunded': 'Reembolsado',
   };
 
   static const _statusColors = <String, Color>{
@@ -61,98 +57,95 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     'shipped': Colors.indigo,
     'delivered': Color(0xFF388E3C),
     'cancelled': Color(0xFFD32F2F),
+    'refunded': Color(0xFF795548),
   };
 
-  /// Allowed next statuses given the current status.
   static const _statusTransitions = <String, List<String>>{
     'pending': ['confirmed', 'cancelled'],
     'confirmed': ['processing', 'cancelled'],
     'processing': ['shipped', 'cancelled'],
     'shipped': ['delivered'],
-    'delivered': [],
+    'delivered': ['refunded'],
     'cancelled': [],
+    'refunded': [],
   };
 
   @override
   void initState() {
     super.initState();
     _bloc = getIt<OrdersBloc>();
-    _bloc.add(const LoadMyOrders()); // admin uses same endpoint; backend scopes by role
-    _scrollController.addListener(_onScroll);
+    _loadOrders();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _scrollController.dispose();
+    _searchCtrl.dispose();
     _bloc.close();
     super.dispose();
   }
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      final state = _bloc.state;
-      if (state is OrdersLoaded) {
-        final totalPages = (state.total / 20).ceil();
-        if (_currentPage < totalPages) {
-          _currentPage++;
-          _bloc.add(LoadMyOrders(status: _selectedStatus, page: _currentPage));
-        }
-      }
-    }
+  void _loadOrders() {
+    _bloc.add(LoadAllOrders(
+      status: _selectedStatus,
+      search: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
+      page: _page,
+    ));
   }
 
-  void _onStatusFilterSelected(String key) {
+  void _onFilterChanged(String key) {
     setState(() {
       _selectedStatus = key == 'all' ? null : key;
-      _currentPage = 1;
+      _page = 1;
     });
-    _bloc.add(LoadMyOrders(status: _selectedStatus));
+    _loadOrders();
   }
 
   void _refresh() {
-    _currentPage = 1;
-    _bloc.add(LoadMyOrders(status: _selectedStatus));
+    _page = 1;
+    _loadOrders();
   }
 
-  // ── Build ───────────────────────────────────────────────────────────
+  // ── Build ──────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width > 800;
+
     return BlocProvider.value(
       value: _bloc,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Gestionar Pedidos'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.filter_list),
-              tooltip: 'Filtros',
-              onPressed: () => _showFilterDialog(),
-            ),
-          ],
-        ),
+        appBar: AppBar(title: const Text('Gestionar Pedidos')),
         body: Column(
           children: [
-            // Search bar
             _buildSearchBar(),
-            // Status filter chips
             _buildStatusChips(),
-            // Orders list
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async => _refresh(),
-                child: BlocBuilder<OrdersBloc, OrdersState>(
-                  builder: (context, state) {
-                    if (state is OrdersLoading) return _buildLoadingShimmer();
-                    if (state is OrdersLoaded) {
-                      if (state.orders.isEmpty) return _buildEmptyState();
-                      return _buildOrdersList(state);
+                child: BlocConsumer<OrdersBloc, OrdersState>(
+                  listener: (context, state) {
+                    if (state is OrderStatusUpdated) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Estado actualizado')),
+                      );
+                      _refresh();
                     }
                     if (state is OrdersError) {
-                      return _buildErrorState(state.message);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(state.message)),
+                      );
                     }
+                  },
+                  builder: (context, state) {
+                    if (state is OrdersLoading) return _shimmer();
+                    if (state is OrdersLoaded) {
+                      if (state.orders.isEmpty) return _empty();
+                      return isWide
+                          ? _buildTable(state)
+                          : _buildList(state);
+                    }
+                    if (state is OrdersError) return _error(state.message);
                     return const SizedBox.shrink();
                   },
                 ),
@@ -164,23 +157,22 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Search bar ──────────────────────────────────────────────────────
+  // ── Search ─────────────────────────────────────────────────
 
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: TextField(
-        controller: _searchController,
+        controller: _searchCtrl,
         decoration: InputDecoration(
           hintText: 'Buscar por número de pedido…',
           prefixIcon: const Icon(Icons.search),
-          suffixIcon: _searchController.text.isNotEmpty
+          suffixIcon: _searchCtrl.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear),
                   onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                    // TODO: filter locally or dispatch search event
+                    _searchCtrl.clear();
+                    _refresh();
                   },
                 )
               : null,
@@ -188,37 +180,35 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         ),
+        onSubmitted: (_) => _refresh(),
         onChanged: (_) => setState(() {}),
-        onSubmitted: (_) {
-          // TODO: dispatch search / filter event
-        },
       ),
     );
   }
 
-  // ── Status chips ────────────────────────────────────────────────────
+  // ── Status chips ───────────────────────────────────────────
 
   Widget _buildStatusChips() {
-    final currentKey = _selectedStatus ?? 'all';
+    final current = _selectedStatus ?? 'all';
     return SizedBox(
       height: 52,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         children: _statusFilters.entries.map((e) {
-          final isSelected = e.key == currentKey;
+          final sel = e.key == current;
           return Padding(
             padding: const EdgeInsets.only(right: 8),
             child: FilterChip(
               label: Text(e.value),
-              selected: isSelected,
+              selected: sel,
               selectedColor: AppTheme.primaryColor.withOpacity(0.15),
               checkmarkColor: AppTheme.primaryColor,
               labelStyle: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : Colors.grey.shade700,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: sel ? AppTheme.primaryColor : Colors.grey.shade700,
+                fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
               ),
-              onSelected: (_) => _onStatusFilterSelected(e.key),
+              onSelected: (_) => _onFilterChanged(e.key),
             ),
           );
         }).toList(),
@@ -226,137 +216,199 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Orders list ─────────────────────────────────────────────────────
+  // ── Table view (wide) ──────────────────────────────────────
 
-  Widget _buildOrdersList(OrdersLoaded state) {
-    // Apply local search filter on order_number
-    final searchTerm = _searchController.text.trim().toLowerCase();
-    final filtered = searchTerm.isEmpty
-        ? state.orders
-        : state.orders.where((o) {
-            final orderNum =
-                (o['order_number'] as String? ?? '').toLowerCase();
-            return orderNum.contains(searchTerm);
-          }).toList();
+  Widget _buildTable(OrdersLoaded state) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: DataTable(
+            headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+            columnSpacing: 20,
+            columns: const [
+              DataColumn(label: Text('Pedido',
+                  style: TextStyle(fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Cliente',
+                  style: TextStyle(fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Fecha',
+                  style: TextStyle(fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Total',
+                  style: TextStyle(fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Estado',
+                  style: TextStyle(fontWeight: FontWeight.w600))),
+              DataColumn(label: Text('Acciones',
+                  style: TextStyle(fontWeight: FontWeight.w600))),
+            ],
+            rows: state.orders.map((order) {
+              final status = order['status'] as String? ?? 'pending';
+              final total = (order['total'] as num?)?.toDouble() ?? 0;
+              final customer = order['customer_name'] ??
+                  order['customer'] ??
+                  order['user_name'] ??
+                  'N/A';
+              final date = _fmtDate(order['created_at'] ?? order['date']);
+              final nextStatuses =
+                  _statusTransitions[status] ?? <String>[];
 
-    if (filtered.isEmpty) return _buildEmptyState();
-
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      itemCount: filtered.length,
-      itemBuilder: (context, index) => _buildOrderCard(filtered[index]),
+              return DataRow(
+                cells: [
+                  DataCell(Text(
+                    order['order_number'] as String? ?? '#${order['id']}',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  )),
+                  DataCell(Text(customer.toString())),
+                  DataCell(Text(date)),
+                  DataCell(Text(_currencyFmt.format(total))),
+                  DataCell(_badge(status)),
+                  DataCell(Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (nextStatuses.isNotEmpty)
+                        _miniActionBtn(order, nextStatuses),
+                      IconButton(
+                        icon: const Icon(Icons.visibility_outlined, size: 20),
+                        tooltip: 'Ver detalle',
+                        onPressed: () {
+                          final id = order['id']?.toString() ?? '';
+                          if (id.isNotEmpty) {
+                            context.push('/admin/orders/$id');
+                          }
+                        },
+                      ),
+                    ],
+                  )),
+                ],
+                onSelectChanged: (_) {
+                  final id = order['id']?.toString() ?? '';
+                  if (id.isNotEmpty) context.push('/admin/orders/$id');
+                },
+              );
+            }).toList(),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildOrderCard(Map<String, dynamic> order) {
-    final orderNumber = order['order_number'] as String? ?? '';
+  Widget _miniActionBtn(
+      Map<String, dynamic> order, List<String> nextStatuses) {
+    // Show the primary next status as a small button
+    final primary =
+        nextStatuses.firstWhere((s) => s != 'cancelled', orElse: () => nextStatuses.first);
+    final color = _statusColors[primary] ?? Colors.grey;
+    final label = _statusLabels[primary] ?? primary;
+
+    return SizedBox(
+      height: 28,
+      child: OutlinedButton(
+        onPressed: () => _confirmChange(order, primary),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: BorderSide(color: color.withOpacity(0.5)),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        ),
+        child: Text(label, style: const TextStyle(fontSize: 11)),
+      ),
+    );
+  }
+
+  // ── List view (mobile) ─────────────────────────────────────
+
+  Widget _buildList(OrdersLoaded state) {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      itemCount: state.orders.length,
+      itemBuilder: (_, i) => _orderCard(state.orders[i]),
+    );
+  }
+
+  Widget _orderCard(Map<String, dynamic> order) {
     final status = order['status'] as String? ?? 'pending';
-    final statusLabel = _statusLabels[status] ?? status;
-    final statusColor = _statusColors[status] ?? Colors.grey;
     final total = (order['total'] as num?)?.toDouble() ?? 0;
-    final userId = order['user_id'] as String? ?? order['user'] as String? ?? '';
-    final createdAt = order['created_at'] as String? ??
-        order['createdAt'] as String? ??
-        '';
-
-    String formattedDate = createdAt;
-    try {
-      final dt = DateTime.parse(createdAt);
-      formattedDate = DateFormat('dd/MM/yyyy HH:mm', 'es_CO').format(dt);
-    } catch (_) {}
-
-    // Determine quick actions based on current status
+    final customer = order['customer_name'] ??
+        order['customer'] ??
+        order['user_name'] ??
+        'N/A';
+    final date = _fmtDate(order['created_at'] ?? order['date']);
     final nextStatuses = _statusTransitions[status] ?? <String>[];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // TODO: Navigate to admin order detail
+          final id = order['id']?.toString() ?? '';
+          if (id.isNotEmpty) context.push('/admin/orders/$id');
         },
-        onLongPress: () => _showStatusChangeDialog(order),
+        onLongPress: nextStatuses.isNotEmpty
+            ? () => _showStatusDialog(order)
+            : null,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header row
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Flexible(
                     child: Text(
-                      orderNumber,
+                      order['order_number'] as String? ??
+                          '#${order['id']}',
                       style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
+                          fontWeight: FontWeight.w700, fontSize: 14),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      statusLabel,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: statusColor,
-                      ),
-                    ),
-                  ),
+                  _badge(status),
                 ],
               ),
               const SizedBox(height: 8),
-              // Details row
               Row(
                 children: [
-                  Icon(Icons.person_outline,
-                      size: 16, color: Colors.grey.shade600),
+                  const Icon(Icons.person_outline,
+                      size: 15, color: Colors.grey),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
-                      userId.isNotEmpty ? userId : 'Cliente',
+                      customer.toString(),
                       style: TextStyle(
                           fontSize: 13, color: Colors.grey.shade700),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Icon(Icons.calendar_today,
-                      size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    formattedDate,
-                    style:
-                        TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
+                  Text(date,
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade500)),
                 ],
               ),
               const SizedBox(height: 8),
-              // Total & quick actions
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _currencyFormat.format(total),
+                    _currencyFmt.format(total),
                     style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppTheme.primaryColor,
-                    ),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.primaryColor),
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: _buildQuickActions(order, nextStatuses),
-                  ),
+                  if (nextStatuses.isNotEmpty)
+                    _miniActionBtn(order, nextStatuses),
                 ],
               ),
             ],
@@ -366,232 +418,132 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Quick action buttons ────────────────────────────────────────────
+  // ── Confirm quick status change ────────────────────────────
 
-  List<Widget> _buildQuickActions(
-    Map<String, dynamic> order,
-    List<String> nextStatuses,
-  ) {
-    const actionConfig = <String, _QuickAction>{
-      'confirmed': _QuickAction('Confirmar', Icons.check_circle_outline,
-          Color(0xFF1565C0)),
-      'processing': _QuickAction(
-          'Procesar', Icons.engineering_outlined, Colors.purple),
-      'shipped': _QuickAction('Enviar', Icons.local_shipping_outlined,
-          Colors.indigo),
-      'delivered': _QuickAction(
-          'Entregar', Icons.done_all, Color(0xFF388E3C)),
-      'cancelled': _QuickAction(
-          'Cancelar', Icons.cancel_outlined, Color(0xFFD32F2F)),
-    };
-
-    return nextStatuses
-        .where((s) => s != 'cancelled') // show cancel only via long-press
-        .map((nextStatus) {
-      final cfg = actionConfig[nextStatus];
-      if (cfg == null) return const SizedBox.shrink();
-      return Padding(
-        padding: const EdgeInsets.only(left: 6),
-        child: SizedBox(
-          height: 32,
-          child: OutlinedButton.icon(
-            onPressed: () =>
-                _confirmStatusChange(order, nextStatus, cfg.label),
-            icon: Icon(cfg.icon, size: 16),
-            label: Text(cfg.label, style: const TextStyle(fontSize: 12)),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: cfg.color,
-              side: BorderSide(color: cfg.color.withOpacity(0.5)),
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  // ── Confirm quick status change ─────────────────────────────────────
-
-  Future<void> _confirmStatusChange(
-    Map<String, dynamic> order,
-    String newStatus,
-    String actionLabel,
-  ) async {
+  Future<void> _confirmChange(
+      Map<String, dynamic> order, String newStatus) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('$actionLabel pedido'),
+        title: Text('Cambiar a ${_statusLabels[newStatus] ?? newStatus}'),
         content: Text(
-          '¿Cambiar estado de "${order['order_number']}" a '
-          '"${_statusLabels[newStatus] ?? newStatus}"?',
-        ),
+            '¿Cambiar estado del pedido ${order['order_number'] ?? '#${order['id']}'}?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancelar')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(actionLabel),
-          ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Confirmar')),
         ],
       ),
     );
     if (confirmed == true) {
-      // TODO: Dispatch UpdateOrderStatus event
-      debugPrint(
-          '[AdminOrders] Update ${order['order_number']} → $newStatus');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              'Pedido actualizado a ${_statusLabels[newStatus] ?? newStatus}'),
-        ),
-      );
-      _refresh();
+      _bloc.add(UpdateOrderStatus(
+        orderId: order['id'].toString(),
+        status: newStatus,
+      ));
     }
   }
 
-  // ── Status change dialog (long‑press / full dropdown) ──────────────
+  // ── Full status dialog (long-press) ────────────────────────
 
-  void _showStatusChangeDialog(Map<String, dynamic> order) {
+  void _showStatusDialog(Map<String, dynamic> order) {
     final currentStatus = order['status'] as String? ?? 'pending';
     final nextStatuses = _statusTransitions[currentStatus] ?? <String>[];
-    if (nextStatuses.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se puede cambiar el estado')),
-      );
-      return;
-    }
+    if (nextStatuses.isEmpty) return;
 
     String? selected;
     final noteCtrl = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) => AlertDialog(
-            title: const Text('Cambiar Estado'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Pedido: ${order['order_number'] ?? ''}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Cambiar Estado'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Pedido: ${order['order_number'] ?? '#${order['id']}'}',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selected,
+                decoration: InputDecoration(
+                  labelText: 'Nuevo estado',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selected,
-                  decoration: InputDecoration(
-                    labelText: 'Nuevo estado',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  items: nextStatuses.map((s) {
-                    return DropdownMenuItem(
-                      value: s,
-                      child: Text(_statusLabels[s] ?? s),
-                    );
-                  }).toList(),
-                  onChanged: (val) =>
-                      setDialogState(() => selected = val),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: noteCtrl,
-                  maxLines: 2,
-                  decoration: InputDecoration(
-                    labelText: 'Nota (opcional)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancelar'),
+                items: nextStatuses
+                    .map((s) => DropdownMenuItem(
+                        value: s, child: Text(_statusLabels[s] ?? s)))
+                    .toList(),
+                onChanged: (v) => setDialogState(() => selected = v),
               ),
-              ElevatedButton(
-                onPressed: selected == null
-                    ? null
-                    : () {
-                        // TODO: Dispatch UpdateOrderStatus(orderId, selected, note)
-                        debugPrint(
-                          '[AdminOrders] Status change: '
-                          '${order['order_number']} → $selected '
-                          '| note: ${noteCtrl.text}',
-                        );
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Estado actualizado a '
-                              '${_statusLabels[selected!] ?? selected}',
-                            ),
-                          ),
-                        );
-                        _refresh();
-                      },
-                child: const Text('Actualizar'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: noteCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: 'Nota (opcional)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  // ── Filter dialog ───────────────────────────────────────────────────
-
-  void _showFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Filtrar por estado'),
-        children: _statusFilters.entries.map((e) {
-          final isSelected =
-              e.key == (_selectedStatus ?? 'all');
-          return SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _onStatusFilterSelected(e.key);
-            },
-            child: Row(
-              children: [
-                if (isSelected)
-                  const Icon(Icons.check, color: AppTheme.primaryColor,
-                      size: 20)
-                else
-                  const SizedBox(width: 20),
-                const SizedBox(width: 12),
-                Text(
-                  e.value,
-                  style: TextStyle(
-                    fontWeight:
-                        isSelected ? FontWeight.w700 : FontWeight.normal,
-                    color: isSelected
-                        ? AppTheme.primaryColor
-                        : Colors.grey.shade800,
-                  ),
-                ),
-              ],
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: selected == null
+                  ? null
+                  : () {
+                      Navigator.pop(ctx);
+                      _bloc.add(UpdateOrderStatus(
+                        orderId: order['id'].toString(),
+                        status: selected!,
+                        note: noteCtrl.text.trim().isEmpty
+                            ? null
+                            : noteCtrl.text.trim(),
+                      ));
+                    },
+              child: const Text('Actualizar'),
             ),
-          );
-        }).toList(),
+          ],
+        ),
       ),
     );
   }
 
-  // ── Loading shimmer ─────────────────────────────────────────────────
+  // ── Helpers ────────────────────────────────────────────────
 
-  Widget _buildLoadingShimmer() {
+  Widget _badge(String status) {
+    final label = _statusLabels[status] ?? status;
+    final color = _statusColors[status] ?? Colors.grey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
+
+  String _fmtDate(dynamic raw) {
+    if (raw == null) return '';
+    try {
+      return DateFormat('dd/MM/yy HH:mm').format(DateTime.parse(raw.toString()));
+    } catch (_) {
+      return raw.toString();
+    }
+  }
+
+  Widget _shimmer() {
     return Shimmer.fromColors(
       baseColor: Colors.grey.shade300,
       highlightColor: Colors.grey.shade100,
@@ -599,7 +551,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         padding: const EdgeInsets.all(12),
         itemCount: 6,
         itemBuilder: (_, __) => Container(
-          height: 110,
+          height: 100,
           margin: const EdgeInsets.only(bottom: 10),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -610,9 +562,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Error state ─────────────────────────────────────────────────────
-
-  Widget _buildErrorState(String message) {
+  Widget _error(String message) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -621,11 +571,9 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           children: [
             Icon(Icons.error_outline, size: 64, color: AppTheme.errorColor),
             const SizedBox(height: 16),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
-            ),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 16)),
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _refresh,
@@ -638,9 +586,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Empty state ─────────────────────────────────────────────────────
-
-  Widget _buildEmptyState() {
+  Widget _empty() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -650,10 +596,8 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             Icon(Icons.assignment_outlined,
                 size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
-            const Text(
-              'No hay pedidos',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
+            const Text('No hay pedidos',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text(
               _selectedStatus != null
@@ -667,13 +611,4 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       ),
     );
   }
-}
-
-// ── Helper ────────────────────────────────────────────────────────────
-class _QuickAction {
-  final String label;
-  final IconData icon;
-  final Color color;
-
-  const _QuickAction(this.label, this.icon, this.color);
 }

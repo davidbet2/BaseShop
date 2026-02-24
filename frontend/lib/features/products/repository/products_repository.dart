@@ -7,7 +7,6 @@ class ProductsRepository {
   ProductsRepository(this._apiClient);
 
   /// Fetch paginated products with optional filters.
-  /// Backend returns: { products: [...], pagination: { page, limit, total, pages } }
   Future<Map<String, dynamic>> getProducts({
     String? categoryId,
     String? search,
@@ -56,7 +55,6 @@ class ProductsRepository {
   }
 
   /// Fetch a single product by its ID.
-  /// Backend returns: { product: { ... } }
   Future<Map<String, dynamic>> getProduct(String id) async {
     final response = await _apiClient.dio.get(
       '${ApiConstants.products}/$id',
@@ -74,7 +72,6 @@ class ProductsRepository {
   }
 
   /// Fetch the category tree.
-  /// Backend returns: { categories: [...] }
   Future<List<Map<String, dynamic>>> getCategories() async {
     final response = await _apiClient.dio.get(
       '${ApiConstants.categories}?flat=true',
@@ -120,5 +117,54 @@ class ProductsRepository {
     int limit = 20,
   }) async {
     return getProducts(categoryId: categoryId, page: page, limit: limit);
+  }
+
+  // ── Admin: Featured toggle ──
+
+  Future<Map<String, dynamic>> toggleFeatured(String id) async {
+    final response = await _apiClient.dio.patch(
+      '${ApiConstants.products}/$id/featured',
+    );
+    final data = response.data;
+    return Map<String, dynamic>.from(data['product'] ?? data['data'] ?? data);
+  }
+
+  // ── Admin: Stock update ──
+
+  Future<Map<String, dynamic>> updateStock(String id, int stock) async {
+    final response = await _apiClient.dio.patch(
+      '${ApiConstants.products}/$id/stock',
+      data: {'stock': stock},
+    );
+    final data = response.data;
+    return Map<String, dynamic>.from(data['product'] ?? data['data'] ?? data);
+  }
+
+  // ── Admin: Category CRUD ──
+
+  Future<Map<String, dynamic>> createCategory(
+      Map<String, dynamic> payload) async {
+    final response = await _apiClient.dio.post(
+      ApiConstants.categories,
+      data: payload,
+    );
+    final data = response.data;
+    return Map<String, dynamic>.from(
+        data['category'] ?? data['data'] ?? data);
+  }
+
+  Future<Map<String, dynamic>> updateCategory(
+      String id, Map<String, dynamic> payload) async {
+    final response = await _apiClient.dio.put(
+      '${ApiConstants.categories}/$id',
+      data: payload,
+    );
+    final data = response.data;
+    return Map<String, dynamic>.from(
+        data['category'] ?? data['data'] ?? data);
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await _apiClient.dio.delete('${ApiConstants.categories}/$id');
   }
 }

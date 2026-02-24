@@ -16,6 +16,12 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
     on<CreateProduct>(_onCreateProduct);
     on<UpdateProduct>(_onUpdateProduct);
     on<DeleteProduct>(_onDeleteProduct);
+    // Admin
+    on<ToggleFeatured>(_onToggleFeatured);
+    on<UpdateProductStock>(_onUpdateProductStock);
+    on<CreateCategory>(_onCreateCategory);
+    on<UpdateCategory>(_onUpdateCategory);
+    on<DeleteCategory>(_onDeleteCategory);
   }
 
   Future<void> _onLoadProducts(
@@ -38,7 +44,6 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       final total = result['total'] as int? ?? 0;
       final page = result['page'] as int? ?? event.page;
 
-      // Try loading categories alongside products
       List<Map<String, dynamic>> categories = [];
       try {
         categories = await _repository.getCategories();
@@ -129,6 +134,86 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       emit(const ProductActionSuccess(message: 'Producto eliminado'));
     } catch (e) {
       debugPrint('[ProductsBloc] DeleteProduct error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  // ── Admin handlers ──
+
+  Future<void> _onToggleFeatured(
+    ToggleFeatured event,
+    Emitter<ProductsState> emit,
+  ) async {
+    try {
+      final product = await _repository.toggleFeatured(event.productId);
+      final isFeatured = product['is_featured'] == true || product['is_featured'] == 1;
+      emit(ProductActionSuccess(
+        message: isFeatured ? 'Producto destacado' : 'Producto no destacado',
+        product: product,
+      ));
+    } catch (e) {
+      debugPrint('[ProductsBloc] ToggleFeatured error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onUpdateProductStock(
+    UpdateProductStock event,
+    Emitter<ProductsState> emit,
+  ) async {
+    try {
+      final product =
+          await _repository.updateStock(event.productId, event.stock);
+      emit(ProductActionSuccess(
+        message: 'Stock actualizado',
+        product: product,
+      ));
+    } catch (e) {
+      debugPrint('[ProductsBloc] UpdateProductStock error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onCreateCategory(
+    CreateCategory event,
+    Emitter<ProductsState> emit,
+  ) async {
+    emit(const ProductsLoading());
+    try {
+      await _repository.createCategory(event.payload);
+      final categories = await _repository.getCategories();
+      emit(CategoriesLoaded(categories: categories));
+    } catch (e) {
+      debugPrint('[ProductsBloc] CreateCategory error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onUpdateCategory(
+    UpdateCategory event,
+    Emitter<ProductsState> emit,
+  ) async {
+    emit(const ProductsLoading());
+    try {
+      await _repository.updateCategory(event.categoryId, event.payload);
+      final categories = await _repository.getCategories();
+      emit(CategoriesLoaded(categories: categories));
+    } catch (e) {
+      debugPrint('[ProductsBloc] UpdateCategory error: $e');
+      emit(ProductsError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onDeleteCategory(
+    DeleteCategory event,
+    Emitter<ProductsState> emit,
+  ) async {
+    try {
+      await _repository.deleteCategory(event.categoryId);
+      final categories = await _repository.getCategories();
+      emit(CategoriesLoaded(categories: categories));
+    } catch (e) {
+      debugPrint('[ProductsBloc] DeleteCategory error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }

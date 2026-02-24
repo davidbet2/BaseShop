@@ -48,6 +48,24 @@ class OrderCreated extends OrdersState {
   List<Object?> get props => [order];
 }
 
+class OrderStatsLoaded extends OrdersState {
+  final Map<String, dynamic> stats;
+
+  const OrderStatsLoaded({required this.stats});
+
+  @override
+  List<Object?> get props => [stats];
+}
+
+class OrderStatusUpdated extends OrdersState {
+  final Map<String, dynamic> order;
+
+  const OrderStatusUpdated({required this.order});
+
+  @override
+  List<Object?> get props => [order];
+}
+
 class OrdersError extends OrdersState {
   final String message;
 
