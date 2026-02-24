@@ -64,17 +64,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           const SizedBox(height: 16),
                           // Top bar: back + skip
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _circleButton(Icons.arrow_back_rounded, () {
-                                context.canPop() ? context.pop() : context.go('/home');
-                              }),
-                              TextButton(
-                                onPressed: () => context.go('/home'),
-                                child: const Text('Omitir', style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-                              ),
-                            ],
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: _circleButton(Icons.arrow_back_rounded, () {
+                              context.canPop() ? context.pop() : context.go('/home');
+                            }),
                           ),
 
                           const Spacer(flex: 2),
@@ -165,13 +159,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 20),
 
                           // Social buttons
-                          Row(
-                            children: [
-                              Expanded(child: _socialButton(Icons.g_mobiledata_rounded, 'Google',
-                                onTap: isLoading ? null : () => context.read<AuthBloc>().add(const AuthGoogleSignInRequested()))),
-                              const SizedBox(width: 12),
-                              Expanded(child: _socialButton(Icons.apple_rounded, 'Apple', onTap: null)),
-                            ],
+                          SizedBox(
+                            width: double.infinity,
+                            child: _socialButton(Icons.g_mobiledata_rounded, 'Google',
+                              onTap: isLoading ? null : () => context.read<AuthBloc>().add(const AuthGoogleSignInRequested())),
                           ),
 
                           const Spacer(flex: 3),

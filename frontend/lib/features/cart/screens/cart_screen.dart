@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:baseshop/core/theme/app_theme.dart';
+import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
+import 'package:baseshop/features/auth/bloc/auth_state.dart';
 import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/cart/bloc/cart_event.dart';
 import 'package:baseshop/features/cart/bloc/cart_state.dart';
@@ -111,7 +113,14 @@ class _CartScreenState extends State<CartScreen> {
                       SizedBox(
                         width: double.infinity, height: 56,
                         child: ElevatedButton.icon(
-                          onPressed: () => context.push('/checkout'),
+                          onPressed: () {
+                            final authState = context.read<AuthBloc>().state;
+                            if (authState is! AuthAuthenticated) {
+                              context.push('/login');
+                              return;
+                            }
+                            context.push('/checkout');
+                          },
                           icon: const Icon(Icons.payment_rounded, size: 20),
                           label: const Text('Proceder al pago', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                         ),

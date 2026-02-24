@@ -684,7 +684,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               child: ElevatedButton.icon(
                 onPressed: stock > 0 ? () {
                   final authState = context.read<AuthBloc>().state;
-                  if (authState is! AuthAuthenticated) { context.push('/login'); return; }
+                  if (authState is! AuthAuthenticated) {
+                    _showAuthPrompt();
+                    return;
+                  }
                   context.read<CartBloc>().add(AddToCart(
                     productId: widget.productId,
                     productName: name,
@@ -717,9 +720,59 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  void _showAuthPrompt() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 48, height: 48,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.shopping_bag_outlined, color: AppTheme.primaryColor, size: 24),
+            ),
+            const SizedBox(height: 16),
+            const Text('Inicia sesión para comprar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+            const SizedBox(height: 8),
+            const Text('Crea una cuenta o inicia sesión para agregar productos a tu carrito y completar tu compra.',
+              textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.4)),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity, height: 52,
+              child: ElevatedButton(
+                onPressed: () { Navigator.pop(ctx); context.push('/login'); },
+                child: const Text('Iniciar sesión', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity, height: 52,
+              child: OutlinedButton(
+                onPressed: () { Navigator.pop(ctx); context.push('/register'); },
+                style: OutlinedButton.styleFrom(side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.3)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                child: const Text('Crear cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.primaryColor)),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _toggleFavorite(bool isFav, String name, double price, String imageUrl) {
     final authState = context.read<AuthBloc>().state;
-    if (authState is! AuthAuthenticated) { context.push('/login'); return; }
+    if (authState is! AuthAuthenticated) { _showAuthPrompt(); return; }
     if (isFav) {
       context.read<FavoritesBloc>().add(RemoveFavorite(productId: widget.productId));
     } else {

@@ -30,7 +30,6 @@ import 'package:baseshop/features/home/screens/shell_screen.dart';
 
 // ── Auth-only paths (require login) ─────────────────────────
 const _authRequiredPaths = <String>{
-  '/cart',
   '/orders',
   '/profile',
   '/checkout',

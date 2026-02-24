@@ -72,22 +72,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   children: [
                     const SizedBox(height: 16),
                     // Top bar
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GestureDetector(
-                          onTap: () => context.canPop() ? context.pop() : context.go('/home'),
-                          child: Container(
-                            width: 42, height: 42,
-                            decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(14)),
-                            child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppTheme.textPrimary),
-                          ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () => context.canPop() ? context.pop() : context.go('/home'),
+                        child: Container(
+                          width: 42, height: 42,
+                          decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(14)),
+                          child: const Icon(Icons.arrow_back_rounded, size: 20, color: AppTheme.textPrimary),
                         ),
-                        TextButton(
-                          onPressed: () => context.go('/home'),
-                          child: const Text('Omitir', style: TextStyle(color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 24),
 
