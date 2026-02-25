@@ -68,6 +68,7 @@ app.get('/health', (req, res) => {
       payments: process.env.PAYMENTS_SERVICE_URL || 'http://localhost:3006',
       reviews: process.env.REVIEWS_SERVICE_URL || 'http://localhost:3007',
       favorites: process.env.FAVORITES_SERVICE_URL || 'http://localhost:3008',
+      config: process.env.CONFIG_SERVICE_URL || 'http://localhost:3009',
     },
   });
 });
@@ -138,6 +139,11 @@ app.use('/api/favorites', createProxyMiddleware({
   pathRewrite: { '^/': '/api/favorites/' },
 }));
 
+app.use('/api/config', createProxyMiddleware({
+  ...proxyOptions(process.env.CONFIG_SERVICE_URL || 'http://localhost:3009'),
+  pathRewrite: { '^/': '/api/config/' },
+}));
+
 // ── 404 catch-all ──
 app.use((req, res) => {
   res.status(404).json({
@@ -158,5 +164,6 @@ app.listen(PORT, () => {
     payments: process.env.PAYMENTS_SERVICE_URL || 'http://localhost:3006',
     reviews: process.env.REVIEWS_SERVICE_URL || 'http://localhost:3007',
     favorites: process.env.FAVORITES_SERVICE_URL || 'http://localhost:3008',
+    config: process.env.CONFIG_SERVICE_URL || 'http://localhost:3009',
   });
 });

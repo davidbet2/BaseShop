@@ -2,6 +2,8 @@ import 'package:get_it/get_it.dart';
 
 import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/services/push_notification_service.dart';
+import 'package:baseshop/core/services/store_config_service.dart';
+import 'package:baseshop/core/cubits/store_config_cubit.dart';
 
 import 'package:baseshop/features/auth/repository/auth_repository.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
@@ -28,6 +30,10 @@ void configureDependencies() {
 
   getIt.registerLazySingleton<PushNotificationService>(
     () => PushNotificationService(getIt<ApiClient>()),
+  );
+
+  getIt.registerLazySingleton<StoreConfigService>(
+    () => StoreConfigService(getIt<ApiClient>()),
   );
 
   // ── Repositories ─────────────────────────────────────────
@@ -79,5 +85,10 @@ void configureDependencies() {
   // Singleton: heart icon state shared across app
   getIt.registerLazySingleton<FavoritesBloc>(
     () => FavoritesBloc(getIt<FavoritesRepository>()),
+  );
+
+  // Singleton: store config shared across app
+  getIt.registerLazySingleton<StoreConfigCubit>(
+    () => StoreConfigCubit(getIt<StoreConfigService>()),
   );
 }

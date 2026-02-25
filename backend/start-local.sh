@@ -51,6 +51,7 @@ start_service() {
     export PAYMENTS_SERVICE_URL="http://localhost:3006"
     export REVIEWS_SERVICE_URL="http://localhost:3007"
     export FAVORITES_SERVICE_URL="http://localhost:3008"
+    export CONFIG_SERVICE_URL="http://localhost:3009"
   fi
 
   mkdir -p "$dir/data"
@@ -74,6 +75,7 @@ start_service "orders-service" 3005
 start_service "payments-service" 3006
 start_service "reviews-service" 3007
 start_service "favorites-service" 3008
+start_service "config-service" 3009
 
 # Wait for services to start
 sleep 3

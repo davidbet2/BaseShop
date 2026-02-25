@@ -12,6 +12,7 @@ services:
       - PAYMENTS_SERVICE_URL=http://payments-service:3006
       - REVIEWS_SERVICE_URL=http://reviews-service:3007
       - FAVORITES_SERVICE_URL=http://favorites-service:3008
+      - CONFIG_SERVICE_URL=http://config-service:3009
       - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
       - ALLOWED_ORIGINS=http://localhost:9090,http://localhost:8080,http://localhost:3000
     depends_on:
@@ -23,6 +24,7 @@ services:
       payments-service: { condition: service_healthy }
       reviews-service: { condition: service_healthy }
       favorites-service: { condition: service_healthy }
+      config-service: { condition: service_healthy }
     networks: [baseshop-network]
     restart: unless-stopped
 
@@ -123,6 +125,17 @@ services:
     networks: [baseshop-network]
     restart: unless-stopped
 
+  config-service:
+    build: { context: ./config-service, dockerfile: Dockerfile }
+    ports: ["3009:3009"]
+    environment:
+      - PORT=3009
+      - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
+      - DB_PATH=/app/data/config.db
+    volumes: [config-data:/app/data]
+    networks: [baseshop-network]
+    restart: unless-stopped
+
 volumes:
   auth-data:
   users-data:
@@ -132,6 +145,7 @@ volumes:
   payments-data:
   reviews-data:
   favorites-data:
+  config-data:
 
 networks:
   baseshop-network:
