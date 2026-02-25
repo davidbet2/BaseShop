@@ -76,9 +76,10 @@ configRouter.put(
     body('featured_desc').optional().isString().isLength({ max: 500 }),
     body('primary_color_hex').optional().isString().matches(/^[0-9A-Fa-f]{6}$/),
     body('banners').optional().isArray(),
-    body('banners.*.image_path').optional().isString(),
-    body('banners.*.product_id').optional().isString().default(null),
-    body('banners.*.custom_price').optional().isFloat({ min: 0 }).default(null),
+    body('banners.*.image_path').optional({ nullable: true }).isString(),
+    body('banners.*.product_id').optional({ nullable: true }).isString(),
+    body('banners.*.custom_price').optional({ nullable: true }).isFloat({ min: 0 }),
+    body('banners.*.sort_order').optional({ nullable: true }).isInt({ min: 0 }),
   ],
   (req, res) => {
     const err = handleValidation(req, res);
