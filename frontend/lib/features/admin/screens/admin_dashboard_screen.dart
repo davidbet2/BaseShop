@@ -6,7 +6,7 @@ import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
 
-/// Modern responsive Admin Dashboard.
+/// Modern responsive Admin Dashboard — optimized for web.
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
 
@@ -37,7 +37,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     try {
       final statsRes = await dio.get('/orders/stats/summary');
-      _stats = Map<String, dynamic>.from(statsRes.data ?? {});
+      final raw = statsRes.data;
+      // API wraps in { data: { ... } }
+      _stats = Map<String, dynamic>.from(raw?['data'] ?? raw ?? {});
     } catch (_) {}
 
     try {
@@ -50,6 +52,31 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     if (mounted) setState(() => _loading = false);
   }
+
+  // ── Parsed stats helpers ───────────────────────────────────
+
+  int get _totalOrders => (_stats['totalOrders'] as num?)?.toInt() ?? 0;
+
+  Map<String, dynamic> get _byStatus =>
+      Map<String, dynamic>.from(_stats['byStatus'] ?? {});
+
+  Map<String, dynamic> get _revenue =>
+      Map<String, dynamic>.from(_stats['revenue'] ?? {});
+
+  double _revenueAmount(String period) {
+    final p = _revenue[period];
+    if (p is Map) return (p['amount'] as num?)?.toDouble() ?? 0;
+    return 0;
+  }
+
+  int _revenueOrders(String period) {
+    final p = _revenue[period];
+    if (p is Map) return (p['orders'] as num?)?.toInt() ?? 0;
+    return 0;
+  }
+
+  int _statusCount(String status) =>
+      (_byStatus[status] as num?)?.toInt() ?? 0;
 
   // ── Status helpers ─────────────────────────────────────────
 
@@ -77,7 +104,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final w = MediaQuery.of(context).size.width;
+    final isWide = w > 800;
+    final isExtraWide = w > 1200;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Panel de Administración')),
@@ -91,9 +120,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   vertical: 20,
                 ),
                 children: [
-                  _buildStatsGrid(isWide),
-                  const SizedBox(height: 28),
-                  _buildRecentOrders(isWide),
+                  // ── 1. KPI Stats ──────────────────────────
+                  _buildStatsGrid(isWide, isExtraWide),
+                  const SizedBox(height: 24),
+
+                  // ── 2. Revenue cards ───────────────────────
+                  _buildRevenueRow(isWide),
+                  const SizedBox(height: 24),
+
+                  // ── 3. Main content ───────────────────────
+                  if (isWide)
+                    _buildWideLayout()
+                  else ...[
+                    _buildQuickActions(),
+                    const SizedBox(height: 20),
+                    _buildStatusBreakdown(),
+                    const SizedBox(height: 20),
+                    _buildRecentOrders(false),
+                  ],
                 ],
               ),
       ),
@@ -102,25 +146,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   // ── Stats grid ─────────────────────────────────────────────
 
-  Widget _buildStatsGrid(bool isWide) {
-    final totalOrders = _stats['total_orders'] ?? 0;
-    final totalRevenue =
-        (_stats['total_revenue'] as num?)?.toDouble() ?? 0;
-    final pending = _stats['pending'] ?? 0;
-    final delivered = _stats['delivered'] ?? 0;
+  Widget _buildStatsGrid(bool isWide, bool isExtraWide) {
+    final pending = _statusCount('pending');
+    final delivered = _statusCount('delivered');
+    final processing = _statusCount('processing');
+    final shipped = _statusCount('shipped');
 
     final items = <_StatItem>[
       _StatItem(
         icon: Icons.assignment_rounded,
         color: Theme.of(context).colorScheme.primary,
-        value: totalOrders.toString(),
+        value: _totalOrders.toString(),
         label: 'Total Pedidos',
-      ),
-      _StatItem(
-        icon: Icons.attach_money_rounded,
-        color: const Color(0xFF388E3C),
-        value: _currencyFmt.format(totalRevenue),
-        label: 'Ingresos Totales',
       ),
       _StatItem(
         icon: Icons.hourglass_top_rounded,
@@ -129,24 +166,76 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         label: 'Pendientes',
       ),
       _StatItem(
+        icon: Icons.sync_rounded,
+        color: Colors.purple,
+        value: processing.toString(),
+        label: 'En Proceso',
+      ),
+      _StatItem(
+        icon: Icons.local_shipping_rounded,
+        color: Colors.indigo,
+        value: shipped.toString(),
+        label: 'Enviados',
+      ),
+      _StatItem(
         icon: Icons.check_circle_rounded,
-        color: const Color(0xFF1565C0),
+        color: const Color(0xFF388E3C),
         value: delivered.toString(),
         label: 'Entregados',
       ),
     ];
+
+    final cols = isExtraWide ? 5 : isWide ? 5 : 2;
 
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: items.length,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: isWide ? 4 : 2,
+        crossAxisCount: cols,
         mainAxisSpacing: 14,
         crossAxisSpacing: 14,
-        childAspectRatio: isWide ? 1.7 : 1.45,
+        childAspectRatio: isWide ? 1.8 : 1.45,
       ),
       itemBuilder: (_, i) => _statCard(items[i]),
+    );
+  }
+
+  // ── Revenue row ────────────────────────────────────────────
+
+  Widget _buildRevenueRow(bool isWide) {
+    final revenueItems = <_StatItem>[
+      _StatItem(
+        icon: Icons.today_rounded,
+        color: const Color(0xFF00897B),
+        value: _currencyFmt.format(_revenueAmount('today')),
+        label: 'Ingresos Hoy (${_revenueOrders('today')} pedidos)',
+      ),
+      _StatItem(
+        icon: Icons.date_range_rounded,
+        color: const Color(0xFF1565C0),
+        value: _currencyFmt.format(_revenueAmount('week')),
+        label: 'Ingresos Semana (${_revenueOrders('week')} pedidos)',
+      ),
+      _StatItem(
+        icon: Icons.calendar_month_rounded,
+        color: const Color(0xFF6A1B9A),
+        value: _currencyFmt.format(_revenueAmount('month')),
+        label: 'Ingresos Mes (${_revenueOrders('month')} pedidos)',
+      ),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: revenueItems.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isWide ? 3 : 1,
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        childAspectRatio: isWide ? 2.5 : 3.5,
+      ),
+      itemBuilder: (_, i) => _statCard(revenueItems[i]),
     );
   }
 
@@ -185,7 +274,169 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Text(
               s.label,
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Wide layout: side-by-side ──────────────────────────────
+
+  Widget _buildWideLayout() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Left: Recent orders (takes most space)
+        Expanded(
+          flex: 3,
+          child: _buildRecentOrders(true),
+        ),
+        const SizedBox(width: 20),
+        // Right: Quick actions + Status breakdown
+        Expanded(
+          flex: 1,
+          child: Column(
+            children: [
+              _buildQuickActions(),
+              const SizedBox(height: 20),
+              _buildStatusBreakdown(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Quick actions ──────────────────────────────────────────
+
+  Widget _buildQuickActions() {
+    final primary = Theme.of(context).colorScheme.primary;
+    final actions = [
+      _QuickAction(
+        icon: Icons.inventory_2_rounded,
+        label: 'Productos',
+        color: primary,
+        onTap: () => context.go('/admin/products'),
+      ),
+      _QuickAction(
+        icon: Icons.receipt_rounded,
+        label: 'Pedidos',
+        color: Colors.orange,
+        onTap: () => context.go('/admin/orders'),
+      ),
+      _QuickAction(
+        icon: Icons.settings_rounded,
+        label: 'Config',
+        color: const Color(0xFF546E7A),
+        onTap: () => context.go('/admin/config'),
+      ),
+    ];
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Acciones Rápidas',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 14),
+            ...actions.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: InkWell(
+                onTap: a.onTap,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: a.color.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(a.icon, color: a.color, size: 20),
+                      const SizedBox(width: 12),
+                      Text(a.label, style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: a.color,
+                        fontSize: 14,
+                      )),
+                      const Spacer(),
+                      Icon(Icons.arrow_forward_ios_rounded, size: 14, color: a.color.withOpacity(0.5)),
+                    ],
+                  ),
+                ),
+              ),
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Status breakdown ───────────────────────────────────────
+
+  Widget _buildStatusBreakdown() {
+    final entries = _byStatus.entries.toList()
+      ..sort((a, b) => (b.value as num).compareTo(a.value as num));
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Pedidos por Estado',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 14),
+            ...entries.map((e) {
+              final status = e.key;
+              final count = (e.value as num).toInt();
+              final color = _statusColors[status] ?? Colors.grey;
+              final label = _statusLabels[status] ?? status;
+              final pct = _totalOrders > 0 ? count / _totalOrders : 0.0;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: color)),
+                        Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: pct,
+                        backgroundColor: Colors.grey.shade100,
+                        color: color,
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ),
       ),
@@ -392,5 +643,19 @@ class _StatItem {
     required this.color,
     required this.value,
     required this.label,
+  });
+}
+
+class _QuickAction {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
   });
 }

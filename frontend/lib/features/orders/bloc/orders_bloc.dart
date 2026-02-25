@@ -8,6 +8,7 @@ import 'package:baseshop/features/orders/repository/orders_repository.dart';
 
 class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
   final OrdersRepository _repository;
+  OrdersRepository get repository => _repository;
 
   OrdersBloc(this._repository) : super(const OrdersInitial()) {
     // Client events

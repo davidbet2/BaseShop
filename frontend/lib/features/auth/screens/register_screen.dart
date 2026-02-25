@@ -174,6 +174,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           : const Text('Crear cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // Divider
+                    Row(children: [
+                      const Expanded(child: Divider(color: AppTheme.dividerColor)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text('o continúa con', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                      ),
+                      const Expanded(child: Divider(color: AppTheme.dividerColor)),
+                    ]),
+                    const SizedBox(height: 20),
+
+                    // Google sign-in
+                    SizedBox(
+                      width: double.infinity,
+                      child: _socialButton(Icons.g_mobiledata_rounded, 'Google',
+                        onTap: isLoading ? null : () => context.read<AuthBloc>().add(const AuthGoogleSignInRequested())),
+                    ),
                     const SizedBox(height: 24),
 
                     // Login link
@@ -217,6 +236,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       validator: validator,
+    );
+  }
+
+  Widget _socialButton(IconData icon, String label, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.white, borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppTheme.dividerColor),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 24, color: AppTheme.textPrimary),
+            const SizedBox(width: 8),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+          ],
+        ),
+      ),
     );
   }
 }

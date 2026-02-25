@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +11,7 @@ import 'package:baseshop/features/orders/bloc/orders_bloc.dart';
 import 'package:baseshop/features/orders/bloc/orders_event.dart';
 import 'package:baseshop/features/orders/bloc/orders_state.dart';
 
-/// Admin Orders Management Screen – uses admin /orders endpoint.
+/// Admin Orders Management Screen – redesigned for web.
 class AdminOrdersScreen extends StatefulWidget {
   const AdminOrdersScreen({super.key});
 
@@ -23,6 +24,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   final _searchCtrl = TextEditingController();
   String? _selectedStatus;
   int _page = 1;
+
+  // Stats
+  Map<String, dynamic>? _stats;
+  bool _statsLoading = true;
 
   final _currencyFmt = NumberFormat.currency(
     locale: 'es_CO',
@@ -60,6 +65,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     'refunded': Color(0xFF795548),
   };
 
+  static const _statusIcons = <String, IconData>{
+    'pending': Icons.schedule,
+    'confirmed': Icons.check_circle_outline,
+    'processing': Icons.autorenew,
+    'shipped': Icons.local_shipping_outlined,
+    'delivered': Icons.done_all,
+    'cancelled': Icons.cancel_outlined,
+    'refunded': Icons.replay,
+  };
+
   static const _statusTransitions = <String, List<String>>{
     'pending': ['confirmed', 'cancelled'],
     'confirmed': ['processing', 'cancelled'],
@@ -75,6 +90,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     super.initState();
     _bloc = getIt<OrdersBloc>();
     _loadOrders();
+    _loadStats();
   }
 
   @override
@@ -92,6 +108,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     ));
   }
 
+  void _loadStats() async {
+    try {
+      final repo = _bloc.repository;
+      final stats = await repo.getOrderStats();
+      if (mounted) setState(() { _stats = stats; _statsLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _statsLoading = false);
+    }
+  }
+
   void _onFilterChanged(String key) {
     setState(() {
       _selectedStatus = key == 'all' ? null : key;
@@ -103,6 +129,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   void _refresh() {
     _page = 1;
     _loadOrders();
+    _loadStats();
   }
 
   // ── Build ──────────────────────────────────────────────────
@@ -115,43 +142,115 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       value: _bloc,
       child: Scaffold(
         appBar: AppBar(title: const Text('Gestionar Pedidos')),
-        body: Column(
-          children: [
-            _buildSearchBar(),
-            _buildStatusChips(),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async => _refresh(),
-                child: BlocConsumer<OrdersBloc, OrdersState>(
-                  listener: (context, state) {
-                    if (state is OrderStatusUpdated) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Estado actualizado')),
-                      );
-                      _refresh();
-                    }
-                    if (state is OrdersError) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(state.message)),
-                      );
-                    }
-                  },
-                  builder: (context, state) {
-                    if (state is OrdersLoading) return _shimmer();
-                    if (state is OrdersLoaded) {
-                      if (state.orders.isEmpty) return _empty();
-                      return isWide
-                          ? _buildTable(state)
-                          : _buildList(state);
-                    }
-                    if (state is OrdersError) return _error(state.message);
-                    return const SizedBox.shrink();
-                  },
+        body: RefreshIndicator(
+          onRefresh: () async => _refresh(),
+          child: ListView(
+            padding: EdgeInsets.symmetric(
+              horizontal: isWide ? 24 : 12,
+              vertical: 16,
+            ),
+            children: [
+              if (isWide) _buildStatsRow(),
+              _buildSearchBar(),
+              _buildStatusChips(),
+              const SizedBox(height: 8),
+              _buildOrdersList(isWide),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Stats Cards ────────────────────────────────────────────
+
+  Widget _buildStatsRow() {
+    if (_statsLoading) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: Row(
+          children: List.generate(4, (_) => Expanded(
+            child: Shimmer.fromColors(
+              baseColor: Colors.grey.shade300,
+              highlightColor: Colors.grey.shade100,
+              child: Container(
+                height: 90,
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
             ),
-          ],
+          )),
+        ),
+      );
+    }
+
+    if (_stats == null) return const SizedBox.shrink();
+
+    final totalOrders = _stats!['totalOrders'] ?? 0;
+    final revenue = _stats!['revenue'] ?? {};
+    final byStatus = Map<String, dynamic>.from(_stats!['byStatus'] ?? {});
+    final pendingCount = byStatus['pending'] ?? 0;
+    final todayRevenue = (revenue['today']?['amount'] as num?)?.toDouble() ?? 0;
+    final monthRevenue = (revenue['month']?['amount'] as num?)?.toDouble() ?? 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          _statCard('Total Pedidos', totalOrders.toString(),
+              Icons.shopping_bag_outlined, Colors.blue),
+          _statCard('Pendientes', pendingCount.toString(),
+              Icons.schedule, Colors.orange),
+          _statCard('Hoy', _currencyFmt.format(todayRevenue),
+              Icons.today, Colors.green),
+          _statCard('Este Mes', _currencyFmt.format(monthRevenue),
+              Icons.calendar_month, Colors.purple),
+        ],
+      ),
+    );
+  }
+
+  Widget _statCard(String label, String value, IconData icon, Color color) {
+    return Expanded(
+      child: Card(
+        elevation: 0,
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade200),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(value,
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 12, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -161,11 +260,11 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 4),
       child: TextField(
         controller: _searchCtrl,
         decoration: InputDecoration(
-          hintText: 'Buscar por número de pedido…',
+          hintText: 'Buscar por número, nombre o email…',
           prefixIcon: const Icon(Icons.search),
           suffixIcon: _searchCtrl.text.isNotEmpty
               ? IconButton(
@@ -194,7 +293,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       height: 52,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: _statusFilters.entries.map((e) {
           final sel = e.key == current;
           return Padding(
@@ -202,10 +301,13 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             child: FilterChip(
               label: Text(e.value),
               selected: sel,
-              selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+              selectedColor:
+                  Theme.of(context).colorScheme.primary.withOpacity(0.15),
               checkmarkColor: Theme.of(context).colorScheme.primary,
               labelStyle: TextStyle(
-                color: sel ? Theme.of(context).colorScheme.primary : Colors.grey.shade700,
+                color: sel
+                    ? Theme.of(context).colorScheme.primary
+                    : Colors.grey.shade700,
                 fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
               ),
               onSelected: (_) => _onFilterChanged(e.key),
@@ -216,130 +318,183 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Table view (wide) ──────────────────────────────────────
+  // ── Orders list ────────────────────────────────────────────
+
+  Widget _buildOrdersList(bool isWide) {
+    return BlocConsumer<OrdersBloc, OrdersState>(
+      listener: (context, state) {
+        if (state is OrderStatusUpdated) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Estado actualizado')),
+          );
+          _refresh();
+        }
+        if (state is OrdersError) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(state.message)),
+          );
+        }
+      },
+      builder: (context, state) {
+        if (state is OrdersLoading) return _shimmer();
+        if (state is OrdersLoaded) {
+          if (state.orders.isEmpty) return _empty();
+          return isWide ? _buildTable(state) : _buildMobileCards(state);
+        }
+        if (state is OrdersError) return _error(state.message);
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── WEB TABLE ──────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
 
   Widget _buildTable(OrdersLoaded state) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Card(
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey.shade200),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: DataTable(
-            headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
-            columnSpacing: 20,
-            columns: const [
-              DataColumn(label: Text('Pedido',
-                  style: TextStyle(fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Cliente',
-                  style: TextStyle(fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Fecha',
-                  style: TextStyle(fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Total',
-                  style: TextStyle(fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Estado',
-                  style: TextStyle(fontWeight: FontWeight.w600))),
-              DataColumn(label: Text('Acciones',
-                  style: TextStyle(fontWeight: FontWeight.w600))),
-            ],
-            rows: state.orders.map((order) {
-              final status = order['status'] as String? ?? 'pending';
-              final total = (order['total'] as num?)?.toDouble() ?? 0;
-              final customer = order['customer_name'] ??
-                  order['customer'] ??
-                  order['user_name'] ??
-                  'N/A';
-              final date = _fmtDate(order['created_at'] ?? order['date']);
-              final nextStatuses =
-                  _statusTransitions[status] ?? <String>[];
-
-              return DataRow(
-                cells: [
-                  DataCell(Text(
-                    order['order_number'] as String? ?? '#${order['id']}',
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  )),
-                  DataCell(Text(customer.toString())),
-                  DataCell(Text(date)),
-                  DataCell(Text(_currencyFmt.format(total))),
-                  DataCell(_badge(status)),
-                  DataCell(Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (nextStatuses.isNotEmpty)
-                        _miniActionBtn(order, nextStatuses),
-                      IconButton(
-                        icon: const Icon(Icons.visibility_outlined, size: 20),
-                        tooltip: 'Ver detalle',
-                        onPressed: () {
-                          final id = order['id']?.toString() ?? '';
-                          if (id.isNotEmpty) {
-                            context.push('/admin/orders/$id');
-                          }
-                        },
-                      ),
-                    ],
-                  )),
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: DataTable(
+                headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+                columnSpacing: 20,
+                columns: const [
+                  DataColumn(label: Text('Pedido',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Cliente',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Productos',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Total',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Estado',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Fecha',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
+                  DataColumn(label: Text('Acciones',
+                      style: TextStyle(fontWeight: FontWeight.w600))),
                 ],
-                onSelectChanged: (_) {
-                  final id = order['id']?.toString() ?? '';
-                  if (id.isNotEmpty) context.push('/admin/orders/$id');
-                },
-              );
-            }).toList(),
+                rows: state.orders.map((order) => _buildTableRow(order)).toList(),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _miniActionBtn(
-      Map<String, dynamic> order, List<String> nextStatuses) {
-    // Show the primary next status as a small button
-    final primary =
-        nextStatuses.firstWhere((s) => s != 'cancelled', orElse: () => nextStatuses.first);
-    final color = _statusColors[primary] ?? Colors.grey;
-    final label = _statusLabels[primary] ?? primary;
+  DataRow _buildTableRow(Map<String, dynamic> order) {
+    final status = order['status'] as String? ?? 'pending';
+    final total = (order['total'] as num?)?.toDouble() ?? 0;
+    final customerName = _customerName(order);
+    final customerEmail = order['customer_email'] ?? '';
+    final itemsCount = order['items_count'] ?? 0;
+    final date = _fmtDate(order['created_at'] ?? order['date']);
+    final nextStatuses = _statusTransitions[status] ?? <String>[];
 
-    return SizedBox(
-      height: 28,
-      child: OutlinedButton(
-        onPressed: () => _confirmChange(order, primary),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: color,
-          side: BorderSide(color: color.withOpacity(0.5)),
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+    return DataRow(
+      cells: [
+        // Pedido
+        DataCell(
+          Text(
+            order['order_number'] as String? ?? '#${order['id']}',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+          ),
         ),
-        child: Text(label, style: const TextStyle(fontSize: 11)),
-      ),
+        // Cliente
+        DataCell(
+          SizedBox(
+            width: 180,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(customerName,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    overflow: TextOverflow.ellipsis),
+                if (customerEmail.toString().isNotEmpty)
+                  Text(customerEmail.toString(),
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                      overflow: TextOverflow.ellipsis),
+              ],
+            ),
+          ),
+        ),
+        // Productos
+        DataCell(
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text('$itemsCount items',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          ),
+        ),
+        // Total
+        DataCell(Text(_currencyFmt.format(total),
+            style: const TextStyle(fontWeight: FontWeight.w700))),
+        // Estado
+        DataCell(_statusBadge(status)),
+        // Fecha
+        DataCell(Text(date, style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
+        // Acciones
+        DataCell(Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (nextStatuses.isNotEmpty)
+              _miniActionBtn(order, nextStatuses),
+            const SizedBox(width: 4),
+            IconButton(
+              icon: const Icon(Icons.visibility_outlined, size: 20),
+              tooltip: 'Ver detalle',
+              onPressed: () {
+                final id = order['id']?.toString() ?? '';
+                if (id.isNotEmpty) context.push('/admin/orders/$id');
+              },
+            ),
+          ],
+        )),
+      ],
+      onSelectChanged: (_) {
+        final id = order['id']?.toString() ?? '';
+        if (id.isNotEmpty) context.push('/admin/orders/$id');
+      },
     );
   }
 
-  // ── List view (mobile) ─────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // ── MOBILE CARDS ───────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
 
-  Widget _buildList(OrdersLoaded state) {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      itemCount: state.orders.length,
-      itemBuilder: (_, i) => _orderCard(state.orders[i]),
+  Widget _buildMobileCards(OrdersLoaded state) {
+    return Column(
+      children: state.orders.map((o) => _orderCard(o)).toList(),
     );
   }
 
   Widget _orderCard(Map<String, dynamic> order) {
     final status = order['status'] as String? ?? 'pending';
     final total = (order['total'] as num?)?.toDouble() ?? 0;
-    final customer = order['customer_name'] ??
-        order['customer'] ??
-        order['user_name'] ??
-        'N/A';
+    final customerName = _customerName(order);
+    final customerEmail = order['customer_email'] ?? '';
+    final shippingAddr = _parseShippingAddress(order['shipping_address']);
+    final itemsCount = order['items_count'] ?? 0;
     final date = _fmtDate(order['created_at'] ?? order['date']);
     final nextStatuses = _statusTransitions[status] ?? <String>[];
+    final statusIcon = _statusIcons[status] ?? Icons.help_outline;
+    final statusColor = _statusColors[status] ?? Colors.grey;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -362,43 +517,58 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Row 1: Order number + status badge
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Flexible(
                     child: Text(
-                      order['order_number'] as String? ??
-                          '#${order['id']}',
+                      order['order_number'] as String? ?? '#${order['id']}',
                       style: const TextStyle(
                           fontWeight: FontWeight.w700, fontSize: 14),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  _badge(status),
+                  _statusBadge(status),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
+              // Row 2: Customer info
               Row(
                 children: [
-                  const Icon(Icons.person_outline,
-                      size: 15, color: Colors.grey),
-                  const SizedBox(width: 4),
+                  Icon(Icons.person_outline, size: 15, color: statusColor),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      customer.toString(),
-                      style: TextStyle(
-                          fontSize: 13, color: Colors.grey.shade700),
+                      customerName + (customerEmail.toString().isNotEmpty
+                          ? ' · $customerEmail'
+                          : ''),
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text(date,
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade500)),
                 ],
               ),
-              const SizedBox(height: 8),
+              // Row 3: Shipping address
+              if (shippingAddr.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on_outlined,
+                        size: 15, color: Colors.grey),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(shippingAddr,
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600),
+                          overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 10),
+              // Row 4: Total, items count, date, action
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     _currencyFmt.format(total),
@@ -407,10 +577,36 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                         fontWeight: FontWeight.w700,
                         color: Theme.of(context).colorScheme.primary),
                   ),
-                  if (nextStatuses.isNotEmpty)
-                    _miniActionBtn(order, nextStatuses),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text('$itemsCount items',
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey.shade600)),
+                  ),
+                  const Spacer(),
+                  Icon(statusIcon, size: 14, color: Colors.grey.shade400),
+                  const SizedBox(width: 4),
+                  Text(date,
+                      style: TextStyle(
+                          fontSize: 11, color: Colors.grey.shade500)),
                 ],
               ),
+              // Row 5: Quick action
+              if (nextStatuses.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _miniActionBtn(order, nextStatuses),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
@@ -418,7 +614,61 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Confirm quick status change ────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // ── SHARED WIDGETS ─────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+
+  Widget _statusBadge(String status) {
+    final label = _statusLabels[status] ?? status;
+    final color = _statusColors[status] ?? Colors.grey;
+    final icon = _statusIcons[status] ?? Icons.help_outline;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w600, color: color)),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniActionBtn(
+      Map<String, dynamic> order, List<String> nextStatuses) {
+    final primary = nextStatuses.firstWhere(
+        (s) => s != 'cancelled',
+        orElse: () => nextStatuses.first);
+    final color = _statusColors[primary] ?? Colors.grey;
+    final label = _statusLabels[primary] ?? primary;
+
+    return SizedBox(
+      height: 28,
+      child: OutlinedButton(
+        onPressed: () => _confirmChange(order, primary),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: color,
+          side: BorderSide(color: color.withOpacity(0.5)),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6)),
+        ),
+        child: Text(label, style: const TextStyle(fontSize: 11)),
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ── DIALOGS ────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
 
   Future<void> _confirmChange(
       Map<String, dynamic> order, String newStatus) async {
@@ -445,8 +695,6 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
       ));
     }
   }
-
-  // ── Full status dialog (long-press) ────────────────────────
 
   void _showStatusDialog(Map<String, dynamic> order) {
     final currentStatus = order['status'] as String? ?? 'pending';
@@ -517,27 +765,62 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     );
   }
 
-  // ── Helpers ────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // ── HELPERS ────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
 
-  Widget _badge(String status) {
-    final label = _statusLabels[status] ?? status;
-    final color = _statusColors[status] ?? Colors.grey;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w600, color: color)),
-    );
+  String _customerName(Map<String, dynamic> order) {
+    // Check each field for non-null AND non-empty
+    for (final key in ['customer_name', 'customer', 'user_name']) {
+      final val = order[key];
+      if (val != null && val.toString().isNotEmpty) return val.toString();
+    }
+    // Fallback to email prefix
+    final email = (order['customer_email'] ?? order['user_email'] ?? '').toString();
+    if (email.isNotEmpty) return email.split('@').first;
+    return 'Sin nombre';
+  }
+
+  String _parseShippingAddress(dynamic raw) {
+    if (raw == null || raw.toString().isEmpty) return '';
+    try {
+      if (raw is String) {
+        final parsed = json.decode(raw);
+        if (parsed is Map) {
+          final parts = <String>[];
+          final street = parsed['street'] ?? parsed['address'] ?? '';
+          final city = parsed['city'] ?? '';
+          final state = parsed['state'] ?? '';
+          final zip = parsed['zip_code'] ?? parsed['postal_code'] ?? '';
+          if (street.toString().isNotEmpty) parts.add(street.toString());
+          if (city.toString().isNotEmpty) parts.add(city.toString());
+          if (state.toString().isNotEmpty) parts.add(state.toString());
+          if (zip.toString().isNotEmpty) parts.add(zip.toString());
+          return parts.join(', ');
+        }
+        return raw;
+      }
+      if (raw is Map) {
+        final parts = <String>[];
+        final street = raw['street'] ?? raw['address'] ?? '';
+        final city = raw['city'] ?? '';
+        final state = raw['state'] ?? '';
+        if (street.toString().isNotEmpty) parts.add(street.toString());
+        if (city.toString().isNotEmpty) parts.add(city.toString());
+        if (state.toString().isNotEmpty) parts.add(state.toString());
+        return parts.join(', ');
+      }
+    } catch (_) {
+      return raw.toString();
+    }
+    return raw.toString();
   }
 
   String _fmtDate(dynamic raw) {
     if (raw == null) return '';
     try {
-      return DateFormat('dd/MM/yy HH:mm').format(DateTime.parse(raw.toString()));
+      return DateFormat('dd/MM/yy HH:mm')
+          .format(DateTime.parse(raw.toString()));
     } catch (_) {
       return raw.toString();
     }
@@ -547,15 +830,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     return Shimmer.fromColors(
       baseColor: Colors.grey.shade300,
       highlightColor: Colors.grey.shade100,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: 6,
-        itemBuilder: (_, __) => Container(
-          height: 100,
-          margin: const EdgeInsets.only(bottom: 10),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+      child: Column(
+        children: List.generate(
+          5,
+          (_) => Container(
+            height: 80,
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ),

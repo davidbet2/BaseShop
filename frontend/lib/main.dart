@@ -56,7 +56,7 @@ void main() async {
   configureDependencies();
 
   // ── Load tokens (fire and forget on web) ───────────────
-  _initApp();
+  await _initApp();
 
   // ── Pre-load store config (primary color, etc.) ────────
   getIt<StoreConfigCubit>().loadConfig();

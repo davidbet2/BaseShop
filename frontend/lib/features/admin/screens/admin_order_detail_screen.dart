@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
@@ -115,8 +117,10 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
     final items = List<Map<String, dynamic>>.from(order['items'] ?? []);
     final statusHistory =
         List<Map<String, dynamic>>.from(order['status_history'] ?? []);
-    final shipping = order['shipping_address'];
+    final shippingRaw = order['shipping_address'];
+    final shipping = _parseShippingMap(shippingRaw);
     final nextStatuses = _statusTransitions[status] ?? <String>[];
+    final notes = (order['notes'] ?? '').toString();
 
     return ListView(
       padding: EdgeInsets.symmetric(
@@ -131,17 +135,16 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 3, child: _buildItemsCard(items)),
-              const SizedBox(width: 20),
+              // Left column: items + notes + history
               Expanded(
-                flex: 2,
+                flex: 3,
                 child: Column(
                   children: [
-                    _buildCustomerCard(order),
-                    const SizedBox(height: 16),
-                    if (shipping != null) _buildShippingCard(shipping),
-                    const SizedBox(height: 16),
-                    _buildSummaryCard(order),
+                    _buildItemsCard(items),
+                    if (notes.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildNotesCard(notes),
+                    ],
                     if (statusHistory.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       _buildHistoryCard(statusHistory),
@@ -149,9 +152,29 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 20),
+              // Right column: summary, customer, shipping, info
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _buildSummaryCard(order),
+                    const SizedBox(height: 16),
+                    _buildCustomerCard(order),
+                    const SizedBox(height: 16),
+                    if (shipping != null) ...[
+                      _buildShippingCard(shipping),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildOrderInfoCard(order),
+                  ],
+                ),
+              ),
             ],
           )
         else ...[
+          _buildSummaryCard(order),
+          const SizedBox(height: 16),
           _buildItemsCard(items),
           const SizedBox(height: 16),
           _buildCustomerCard(order),
@@ -160,7 +183,11 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
             _buildShippingCard(shipping),
             const SizedBox(height: 16),
           ],
-          _buildSummaryCard(order),
+          _buildOrderInfoCard(order),
+          if (notes.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildNotesCard(notes),
+          ],
           if (statusHistory.isNotEmpty) ...[
             const SizedBox(height: 16),
             _buildHistoryCard(statusHistory),
@@ -259,9 +286,11 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             ...items.map((item) {
-              final price = (item['price'] as num?)?.toDouble() ?? 0;
-              final qty = item['quantity'] as int? ?? 1;
+              final price = (item['product_price'] as num?)?.toDouble() ??
+                  (item['price'] as num?)?.toDouble() ?? 0;
+              final qty = (item['quantity'] as num?)?.toInt() ?? 1;
               final name = item['product_name'] ?? item['name'] ?? 'Producto';
+              final itemSubtotal = (item['subtotal'] as num?)?.toDouble() ?? (price * qty);
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
@@ -304,7 +333,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                         ],
                       ),
                     ),
-                    Text(_currencyFmt.format(price * qty),
+                    Text(_currencyFmt.format(itemSubtotal),
                         style: const TextStyle(fontWeight: FontWeight.w600)),
                   ],
                 ),
@@ -319,11 +348,15 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
   // ── Customer ───────────────────────────────────────────────
 
   Widget _buildCustomerCard(Map<String, dynamic> order) {
-    final name = order['customer_name'] ??
+    final rawName = order['customer_name'] ??
         order['user_name'] ??
-        order['customer'] ??
-        'N/A';
-    final email = order['customer_email'] ?? order['user_email'] ?? '';
+        order['customer'];
+    final name = (rawName != null && rawName.toString().isNotEmpty)
+        ? rawName.toString()
+        : 'Sin nombre';
+    final email = (order['customer_email'] ?? order['user_email'] ?? '').toString();
+    final phone = (order['customer_phone'] ?? '').toString();
+    final userId = order['user_id']?.toString() ?? '';
 
     return Card(
       elevation: 0,
@@ -336,22 +369,28 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Cliente',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            Row(children: [
-              const Icon(Icons.person_outline, size: 18, color: Colors.grey),
-              const SizedBox(width: 8),
-              Expanded(child: Text(name.toString())),
-            ]),
-            if (email.toString().isNotEmpty) ...[
-              const SizedBox(height: 6),
-              Row(children: [
-                const Icon(Icons.email_outlined, size: 18, color: Colors.grey),
-                const SizedBox(width: 8),
-                Expanded(child: Text(email.toString())),
-              ]),
-            ],
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.person_outline, size: 20, color: Colors.blue),
+                ),
+                const SizedBox(width: 12),
+                const Text('Cliente',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const Divider(height: 24),
+            _infoRow(Icons.person, name),
+            if (email.isNotEmpty) _infoRow(Icons.email_outlined, email),
+            if (phone.isNotEmpty) _infoRow(Icons.phone_outlined, phone),
+            if (userId.isNotEmpty)
+              _infoRow(Icons.badge_outlined, 'ID: $userId',
+                  color: Colors.grey.shade500, fontSize: 12),
           ],
         ),
       ),
@@ -360,12 +399,12 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
 
   // ── Shipping ───────────────────────────────────────────────
 
-  Widget _buildShippingCard(dynamic shipping) {
-    final addr = shipping is Map ? shipping : {};
-    final street = addr['street'] ?? addr['address'] ?? '';
-    final city = addr['city'] ?? '';
-    final state = addr['state'] ?? '';
-    final zip = addr['zip_code'] ?? addr['postal_code'] ?? '';
+  Widget _buildShippingCard(Map<String, dynamic> shipping) {
+    final street = (shipping['street'] ?? shipping['address'] ?? '').toString();
+    final city = (shipping['city'] ?? '').toString();
+    final state = (shipping['state'] ?? '').toString();
+    final zip = (shipping['zip_code'] ?? shipping['postal_code'] ?? '').toString();
+    final country = (shipping['country'] ?? '').toString();
 
     return Card(
       elevation: 0,
@@ -378,12 +417,27 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Dirección de Envío',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            if (street.toString().isNotEmpty) Text(street.toString()),
-            if (city.toString().isNotEmpty || state.toString().isNotEmpty)
-              Text('$city, $state $zip'),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.local_shipping_outlined, size: 20, color: Colors.green),
+                ),
+                const SizedBox(width: 12),
+                const Text('Dirección de Envío',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const Divider(height: 24),
+            if (street.isNotEmpty) _infoRow(Icons.home_outlined, street),
+            if (city.isNotEmpty || state.isNotEmpty)
+              _infoRow(Icons.location_city, [city, state].where((s) => s.isNotEmpty).join(', ')),
+            if (zip.isNotEmpty) _infoRow(Icons.markunread_mailbox_outlined, 'CP: $zip'),
+            if (country.isNotEmpty) _infoRow(Icons.flag_outlined, country),
           ],
         ),
       ),
@@ -396,8 +450,11 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
     final subtotal = (order['subtotal'] as num?)?.toDouble() ??
         (order['total'] as num?)?.toDouble() ??
         0;
-    final shipping = (order['shipping_cost'] as num?)?.toDouble() ?? 0;
+    final shippingCost = (order['shipping_cost'] as num?)?.toDouble() ?? 0;
+    final tax = (order['tax'] as num?)?.toDouble() ?? 0;
     final total = (order['total'] as num?)?.toDouble() ?? subtotal;
+    final paymentMethod = (order['payment_method'] ?? '').toString();
+    final itemsCount = (order['items'] as List?)?.length ?? 0;
 
     return Card(
       elevation: 0,
@@ -410,36 +467,70 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Resumen',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 12),
-            _summaryRow('Subtotal', _currencyFmt.format(subtotal)),
-            _summaryRow('Envío', _currencyFmt.format(shipping)),
-            const Divider(height: 20),
-            _summaryRow('Total', _currencyFmt.format(total), bold: true),
-            const SizedBox(height: 8),
-            Text(
-              'Método de pago: ${order['payment_method'] ?? 'N/A'}',
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.receipt_long_outlined, size: 20, color: Colors.orange),
+                ),
+                const SizedBox(width: 12),
+                const Text('Resumen del Pedido',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
             ),
+            const Divider(height: 24),
+            _summaryRow('Productos ($itemsCount)', _currencyFmt.format(subtotal)),
+            if (shippingCost > 0)
+              _summaryRow('Envío', _currencyFmt.format(shippingCost)),
+            if (tax > 0)
+              _summaryRow('Impuestos', _currencyFmt.format(tax)),
+            const Divider(height: 20),
+            _summaryRow('Total', _currencyFmt.format(total), bold: true, large: true),
+            if (paymentMethod.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.payment, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 6),
+                    Text(paymentMethod,
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade700)),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _summaryRow(String label, String value, {bool bold = false}) {
+  Widget _summaryRow(String label, String value,
+      {bool bold = false, bool large = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
               style: TextStyle(
+                  fontSize: large ? 16 : 14,
                   fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
           Text(value,
               style: TextStyle(
-                  fontWeight: bold ? FontWeight.w700 : FontWeight.normal)),
+                  fontSize: large ? 18 : 14,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.normal,
+                  color: bold ? Theme.of(context).colorScheme.primary : null)),
         ],
       ),
     );
@@ -589,6 +680,123 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
   }
 
   // ── Helpers ────────────────────────────────────────────────
+
+  Widget _infoRow(IconData icon, String text,
+      {Color? color, double fontSize = 14}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color ?? Colors.grey.shade600),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(text,
+                style: TextStyle(fontSize: fontSize, color: color)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNotesCard(String notes) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.amber.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.sticky_note_2_outlined,
+                      size: 20, color: Colors.amber),
+                ),
+                const SizedBox(width: 12),
+                const Text('Notas del Pedido',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const Divider(height: 24),
+            Text(notes,
+                style: TextStyle(
+                    fontSize: 14, color: Colors.grey.shade700, height: 1.5)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderInfoCard(Map<String, dynamic> order) {
+    final orderId = order['id']?.toString() ?? '';
+    final createdAt = _fmtDate(order['created_at']);
+    final updatedAt = _fmtDate(order['updated_at']);
+    final paymentId = (order['payment_id'] ?? '').toString();
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.info_outline,
+                      size: 20, color: Colors.grey.shade600),
+                ),
+                const SizedBox(width: 12),
+                const Text('Información',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ],
+            ),
+            const Divider(height: 24),
+            if (orderId.isNotEmpty)
+              _infoRow(Icons.tag, 'ID: $orderId',
+                  color: Colors.grey.shade500, fontSize: 12),
+            if (createdAt.isNotEmpty)
+              _infoRow(Icons.calendar_today_outlined, 'Creado: $createdAt'),
+            if (updatedAt.isNotEmpty && updatedAt != createdAt)
+              _infoRow(Icons.update, 'Actualizado: $updatedAt'),
+            if (paymentId.isNotEmpty)
+              _infoRow(Icons.receipt_outlined, 'Pago: $paymentId',
+                  fontSize: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Map<String, dynamic>? _parseShippingMap(dynamic raw) {
+    if (raw == null || raw.toString().isEmpty) return null;
+    try {
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+      if (raw is String) {
+        final parsed = json.decode(raw);
+        if (parsed is Map) return Map<String, dynamic>.from(parsed);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   String _fmtDate(dynamic raw) {
     if (raw == null) return '';

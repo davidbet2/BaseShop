@@ -83,6 +83,9 @@ const initDatabase = async () => {
     id TEXT PRIMARY KEY,
     order_number TEXT UNIQUE NOT NULL,
     user_id TEXT NOT NULL,
+    customer_name TEXT DEFAULT '',
+    customer_email TEXT DEFAULT '',
+    customer_phone TEXT DEFAULT '',
     status TEXT DEFAULT 'pending',
     subtotal REAL DEFAULT 0,
     shipping_cost REAL DEFAULT 0,
@@ -96,6 +99,19 @@ const initDatabase = async () => {
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
+
+  // ── Migraciones: agregar columnas faltantes ──
+  const existingCols = rawDb.exec("PRAGMA table_info(orders)");
+  const colNames = existingCols.length > 0 ? existingCols[0].values.map(r => r[1]) : [];
+  if (!colNames.includes('customer_name')) {
+    rawDb.run("ALTER TABLE orders ADD COLUMN customer_name TEXT DEFAULT ''");
+  }
+  if (!colNames.includes('customer_email')) {
+    rawDb.run("ALTER TABLE orders ADD COLUMN customer_email TEXT DEFAULT ''");
+  }
+  if (!colNames.includes('customer_phone')) {
+    rawDb.run("ALTER TABLE orders ADD COLUMN customer_phone TEXT DEFAULT ''");
+  }
 
   // ── Tabla de items del pedido ──
   rawDb.run(`CREATE TABLE IF NOT EXISTS order_items (

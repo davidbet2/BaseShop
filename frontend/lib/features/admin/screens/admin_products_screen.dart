@@ -138,9 +138,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
       value: _bloc,
       child: Scaffold(
         appBar: AppBar(
-          title: _selectMode
-              ? Text('${_selectedProductIds.length + _selectedCategoryIds.length} seleccionados')
-              : _searchVisible
+          title: _searchVisible
               ? TextField(
                   controller: _searchCtrl,
                   autofocus: true,
@@ -154,48 +152,18 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                 )
               : const Text('Gestionar Productos'),
           actions: [
-            // Multi-select toggle
-            if (_selectMode) ...
-              [
-                IconButton(
-                  icon: const Icon(Icons.delete_sweep, color: Colors.white),
-                  tooltip: 'Eliminar seleccionados',
-                  onPressed: _deleteSelected,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Cancelar selección',
-                  onPressed: () => setState(() {
-                    _selectMode = false;
-                    _selectedProductIds.clear();
-                    _selectedCategoryIds.clear();
-                  }),
-                ),
-              ]
-            else ...[
-              IconButton(
-                icon: Icon(_searchVisible ? Icons.close : Icons.search),
-                onPressed: () {
-                  setState(() {
-                    _searchVisible = !_searchVisible;
-                    if (!_searchVisible) {
-                      _searchCtrl.clear();
-                      _refresh();
-                    }
-                  });
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.checklist),
-                tooltip: 'Seleccionar varios',
-                onPressed: () => setState(() => _selectMode = true),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: 'Agregar producto',
-                onPressed: () => _showProductForm(context),
-              ),
-            ],
+            IconButton(
+              icon: Icon(_searchVisible ? Icons.close : Icons.search),
+              onPressed: () {
+                setState(() {
+                  _searchVisible = !_searchVisible;
+                  if (!_searchVisible) {
+                    _searchCtrl.clear();
+                    _refresh();
+                  }
+                });
+              },
+            ),
           ],
           bottom: TabBar(
             controller: _tabCtrl,
@@ -233,9 +201,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   // ══════════════════════════════════════════════════════════
 
   Widget _buildProductsTab() {
-    return RefreshIndicator(
-      onRefresh: () async => _refresh(),
-      child: BlocConsumer<ProductsBloc, ProductsState>(
+    return Column(
+      children: [
+        _buildProductsSelectionBar(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async => _refresh(),
+            child: BlocConsumer<ProductsBloc, ProductsState>(
         listener: (context, state) {
           if (state is ProductActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -261,6 +233,53 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           if (state is ProductsError) return _errorWidget(state.message);
           return const SizedBox.shrink();
         },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProductsSelectionBar() {
+    if (!_selectMode) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            TextButton.icon(
+              onPressed: () => setState(() => _selectMode = true),
+              icon: const Icon(Icons.checklist, size: 20),
+              label: const Text('Seleccionar'),
+            ),
+          ],
+        ),
+      );
+    }
+    return Container(
+      color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Text(
+            '${_selectedProductIds.length} seleccionados',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const Spacer(),
+          if (_selectedProductIds.isNotEmpty)
+            TextButton.icon(
+              onPressed: _deleteSelected,
+              icon: Icon(Icons.delete_sweep, color: AppTheme.errorColor),
+              label: Text('Eliminar', style: TextStyle(color: AppTheme.errorColor)),
+            ),
+          TextButton.icon(
+            onPressed: () => setState(() {
+              _selectMode = false;
+              _selectedProductIds.clear();
+            }),
+            icon: const Icon(Icons.close),
+            label: const Text('Cancelar'),
+          ),
+        ],
       ),
     );
   }
@@ -535,8 +554,78 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   // ── CATEGORIES TAB ────────────────────────────────────────
   // ══════════════════════════════════════════════════════════
 
+  Widget _buildCategoriesSelectionBar() {
+    if (!_selectMode) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            TextButton.icon(
+              onPressed: () => setState(() => _selectMode = true),
+              icon: const Icon(Icons.checklist, size: 20),
+              label: const Text('Seleccionar'),
+            ),
+          ],
+        ),
+      );
+    }
+    return BlocBuilder<ProductsBloc, ProductsState>(
+      builder: (context, state) {
+        List<Map<String, dynamic>> categories = [];
+        if (state is ProductsLoaded) categories = state.categories;
+        else if (state is CategoriesLoaded) categories = state.categories;
+        final allIds = categories.map(_id).toSet();
+        final allSelected = allIds.isNotEmpty && allIds.every(_selectedCategoryIds.contains);
+
+        return Container(
+          color: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Checkbox(
+                value: allSelected,
+                onChanged: (v) {
+                  setState(() {
+                    if (v == true) {
+                      _selectedCategoryIds.addAll(allIds);
+                    } else {
+                      _selectedCategoryIds.clear();
+                    }
+                  });
+                },
+              ),
+              Text(
+                '${_selectedCategoryIds.length} seleccionados',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (_selectedCategoryIds.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _deleteSelected,
+                  icon: Icon(Icons.delete_sweep, color: AppTheme.errorColor),
+                  label: Text('Eliminar', style: TextStyle(color: AppTheme.errorColor)),
+                ),
+              TextButton.icon(
+                onPressed: () => setState(() {
+                  _selectMode = false;
+                  _selectedCategoryIds.clear();
+                }),
+                icon: const Icon(Icons.close),
+                label: const Text('Cancelar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildCategoriesTab() {
-    return BlocConsumer<ProductsBloc, ProductsState>(
+    return Column(
+      children: [
+        _buildCategoriesSelectionBar(),
+        Expanded(
+          child: BlocConsumer<ProductsBloc, ProductsState>(
       listener: (context, state) {
         if (state is CategoriesLoaded) {
           // Categories loaded/refreshed – nothing else needed
@@ -564,11 +653,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                     style:
                         TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                ElevatedButton.icon(
-                  onPressed: () => _showCategoryForm(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('Crear categoría'),
-                ),
+                Text('Usa el botón + para agregar tu primera categoría',
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
               ],
             ),
           );
@@ -685,6 +771,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           ),
         );
       },
+    ),
+        ),
+      ],
     );
   }
 
@@ -2020,8 +2109,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
             const Text('No hay productos',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text('Agrega tu primer producto con el botón +',
-                style: TextStyle(color: Colors.grey.shade600)),
+            Text('Usa el botón + para agregar tu primer producto',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade500)),
           ],
         ),
       ),

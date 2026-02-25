@@ -56,6 +56,12 @@ router.post('/', [
     .optional(),
   body('payment_method')
     .optional().isString(),
+  body('customer_name')
+    .optional().isString(),
+  body('customer_email')
+    .optional().isEmail(),
+  body('customer_phone')
+    .optional().isString(),
   body('notes')
     .optional().isString(),
 ], (req, res) => {
@@ -65,7 +71,8 @@ router.post('/', [
 
     const db = getDb();
     const userId = req.user.id || req.user.userId;
-    const { items, shipping_address, billing_address, payment_method, notes } = req.body;
+    const userEmail = req.user.email || '';
+    const { items, shipping_address, billing_address, payment_method, notes, customer_name, customer_email, customer_phone } = req.body;
 
     // Calcular totales
     let subtotal = 0;
@@ -89,11 +96,16 @@ router.post('/', [
     const shippingAddrStr = typeof shipping_address === 'object' ? JSON.stringify(shipping_address) : (shipping_address || '');
     const billingAddrStr = typeof billing_address === 'object' ? JSON.stringify(billing_address) : (billing_address || '');
 
+    // Resolver nombre del cliente
+    const resolvedName = customer_name || '';
+    const resolvedEmail = customer_email || userEmail || '';
+    const resolvedPhone = customer_phone || '';
+
     // Insertar pedido
     db.prepare(
-      `INSERT INTO orders (id, order_number, user_id, status, subtotal, shipping_cost, tax, total, shipping_address, billing_address, payment_method, payment_id, notes)
-       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, '', ?)`
-    ).run(orderId, orderNumber, userId, subtotal, shippingCost, tax, total, shippingAddrStr, billingAddrStr, payment_method || '', notes || '');
+      `INSERT INTO orders (id, order_number, user_id, customer_name, customer_email, customer_phone, status, subtotal, shipping_cost, tax, total, shipping_address, billing_address, payment_method, payment_id, notes)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, '', ?)`
+    ).run(orderId, orderNumber, userId, resolvedName, resolvedEmail, resolvedPhone, subtotal, shippingCost, tax, total, shippingAddrStr, billingAddrStr, payment_method || '', notes || '');
 
     // Insertar items del pedido
     for (const item of processedItems) {
@@ -278,9 +290,9 @@ router.get('/', roleMiddleware('admin'), (req, res) => {
     }
 
     if (search) {
-      countSql += ' AND order_number LIKE ?';
-      dataSql += ' AND order_number LIKE ?';
-      params.push(`%${search}%`);
+      countSql += " AND (order_number LIKE ? OR customer_name LIKE ? OR customer_email LIKE ?)";
+      dataSql += " AND (order_number LIKE ? OR customer_name LIKE ? OR customer_email LIKE ?)";
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
     dataSql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -289,8 +301,14 @@ router.get('/', roleMiddleware('admin'), (req, res) => {
     const total = countResult ? countResult.total : 0;
     const orders = db.prepare(dataSql).all(...params, limit, offset);
 
+    // Enrich orders with items count
+    const enriched = orders.map(order => {
+      const itemsCount = db.prepare('SELECT COUNT(*) as cnt FROM order_items WHERE order_id = ?').get(order.id);
+      return { ...order, items_count: itemsCount ? itemsCount.cnt : 0 };
+    });
+
     res.json({
-      data: orders,
+      data: enriched,
       pagination: {
         page,
         limit,

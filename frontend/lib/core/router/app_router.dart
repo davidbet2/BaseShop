@@ -59,28 +59,40 @@ const _adminPaths = <String>{
 
 /// Listenable that notifies GoRouter when auth state changes.
 class _AuthNotifier extends ChangeNotifier {
-  late final StreamSubscription<AuthState> _sub;
+  StreamSubscription<AuthState>? _sub;
 
   _AuthNotifier() {
-    _sub = getIt<AuthBloc>().stream.listen((_) => notifyListeners());
+    _init();
+  }
+
+  void _init() {
+    try {
+      if (getIt.isRegistered<AuthBloc>()) {
+        _sub = getIt<AuthBloc>().stream.listen((_) => notifyListeners());
+      }
+    } catch (_) {
+      // DI not ready yet — will work on next router evaluation
+    }
   }
 
   @override
   void dispose() {
-    _sub.cancel();
+    _sub?.cancel();
     super.dispose();
   }
 }
 
-final _authNotifier = _AuthNotifier();
+late final _authNotifier = _AuthNotifier();
 
 // ── Router ──────────────────────────────────────────────────
-final GoRouter appRouter = GoRouter(
+late final GoRouter appRouter = GoRouter(
   initialLocation: '/home',
   debugLogDiagnostics: true,
   refreshListenable: _authNotifier,
   redirect: (BuildContext context, GoRouterState state) {
-    final authState = getIt<AuthBloc>().state;
+    try {
+      if (!getIt.isRegistered<AuthBloc>()) return null;
+      final authState = getIt<AuthBloc>().state;
     final isAuthenticated = authState is AuthAuthenticated;
     final currentPath = state.matchedLocation;
     final isAuthPage = _authPages.contains(currentPath);
@@ -108,6 +120,10 @@ final GoRouter appRouter = GoRouter(
     }
 
     return null; // no redirect
+    } catch (e) {
+      debugPrint('[Router] Redirect error: $e');
+      return null;
+    }
   },
   errorBuilder: (context, state) => const NotFoundScreen(),
   routes: [
