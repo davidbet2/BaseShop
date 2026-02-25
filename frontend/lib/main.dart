@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
+import 'package:baseshop/core/utils/web_favicon.dart';
+
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/router/app_router.dart';
@@ -70,8 +72,20 @@ class MyApp extends StatelessWidget {
               ? configState.config.primaryColor
               : AppTheme.defaultPrimary;
 
+          // Dynamic favicon + tab title on web
+          final storeName = configState is StoreConfigLoaded
+              ? configState.config.storeName
+              : 'BaseShop';
+          final storeLogo = configState is StoreConfigLoaded
+              ? configState.config.storeLogo
+              : '';
+          if (kIsWeb) {
+            updateWebFavicon(storeLogo);
+            updateWebTitle(storeName);
+          }
+
           return MaterialApp.router(
-            title: 'BaseShop',
+            title: storeName,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme(primaryColor),
             routerConfig: appRouter,
