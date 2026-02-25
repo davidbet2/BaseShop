@@ -7,6 +7,15 @@ const multer = require('multer');
 const { getDb } = require('../database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 
+// Optional sharp for image optimization (graceful fallback)
+let sharp;
+try {
+  sharp = require('sharp');
+  console.log('[products] sharp loaded — image optimization enabled');
+} catch {
+  console.warn('[products] sharp not available — images will not be optimized');
+}
+
 // ── Multer config for image uploads ──
 const UPLOADS_DIR = path.resolve(process.env.UPLOADS_PATH || './data/uploads');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -167,13 +176,37 @@ productsRouter.post('/upload',
   authMiddleware,
   roleMiddleware('admin'),
   upload.single('image'),
-  (req, res) => {
+  async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: 'No se proporcionó ninguna imagen válida' });
     }
+
+    let finalFilename = req.file.filename;
+
+    // Optimize image if sharp is available
+    if (sharp) {
+      try {
+        const ext = path.extname(req.file.filename).toLowerCase();
+        const optimizedName = req.file.filename.replace(/\.[^.]+$/, '.webp');
+        const optimizedPath = path.join(UPLOADS_DIR, optimizedName);
+
+        await sharp(req.file.path)
+          .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toFile(optimizedPath);
+
+        // Remove original, use optimized webp
+        fs.unlinkSync(req.file.path);
+        finalFilename = optimizedName;
+        console.log(`[upload] Optimized: ${req.file.filename} → ${optimizedName}`);
+      } catch (err) {
+        console.warn('[upload] Optimization failed, using original:', err.message);
+      }
+    }
+
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const url = `${baseUrl}/uploads/${req.file.filename}`;
-    res.json({ url, filename: req.file.filename });
+    const url = `${baseUrl}/uploads/${finalFilename}`;
+    res.json({ url, filename: finalFilename });
   }
 );
 

@@ -3,7 +3,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:dio/dio.dart' as dio_pkg;
+
+import 'package:baseshop/core/network/api_client.dart';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
@@ -97,23 +99,44 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
     }
   }
 
-  /// Save an XFile from image_picker to the app's documents directory and
-  /// return the local file path.
-  Future<String> _saveImageLocally(XFile xfile, String prefix) async {
-    if (kIsWeb) return xfile.path; // Web: use the blob URL directly
-    final dir = await getApplicationDocumentsDirectory();
-    final ext = xfile.name.split('.').last;
-    final dest = '${dir.path}/${prefix}_${DateTime.now().millisecondsSinceEpoch}.$ext';
-    final bytes = await xfile.readAsBytes();
-    await File(dest).writeAsBytes(bytes);
-    return dest;
+  /// Upload an image file to the backend and return its URL.
+  Future<String?> _uploadImage(XFile xfile) async {
+    try {
+      final apiClient = getIt<ApiClient>();
+
+      dio_pkg.MultipartFile multipartFile;
+      if (kIsWeb) {
+        final bytes = await xfile.readAsBytes();
+        multipartFile = dio_pkg.MultipartFile.fromBytes(bytes, filename: xfile.name);
+      } else {
+        multipartFile = await dio_pkg.MultipartFile.fromFile(xfile.path, filename: xfile.name);
+      }
+
+      final formData = dio_pkg.FormData.fromMap({'image': multipartFile});
+      final response = await apiClient.dio.post('/api/products/upload', data: formData);
+
+      if (response.statusCode == 200 && response.data['url'] != null) {
+        String url = response.data['url'].toString();
+        final baseUrl = apiClient.dio.options.baseUrl;
+        if (url.contains(':3003')) {
+          url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), baseUrl);
+        }
+        return url;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Upload error: $e');
+      return null;
+    }
   }
 
   Future<void> _pickLogo() async {
-    final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 512);
+    final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 512, imageQuality: 85);
     if (xfile == null) return;
-    final path = await _saveImageLocally(xfile, 'logo');
-    setState(() => _logoPath = path);
+    final url = await _uploadImage(xfile);
+    if (url != null) {
+      setState(() => _logoPath = url);
+    }
   }
 
   // ── Build ──────────────────────────────────────────────────
@@ -512,6 +535,10 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                   ),
                 ),
                 IconButton(
+                  icon: Icon(Icons.edit_outlined, size: 20, color: _currentColor),
+                  onPressed: () => _editBannerDialog(entry.key),
+                ),
+                IconButton(
                   icon: Icon(Icons.delete_outline, size: 20, color: AppTheme.errorColor),
                   onPressed: () {
                     setState(() => _banners.removeAt(entry.key));
@@ -604,13 +631,15 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                             icon: const Icon(Icons.upload_file, size: 18),
                             label: const Text('Subir imagen'),
                             onPressed: () async {
-                              final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1920);
+                              final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1920, imageQuality: 80);
                               if (xfile == null) return;
-                              final path = await _saveImageLocally(xfile, 'banner');
-                              ss(() {
-                                pickedImagePath = path;
-                                urlCtrl.clear();
-                              });
+                              final url = await _uploadImage(xfile);
+                              if (url != null) {
+                                ss(() {
+                                  pickedImagePath = url;
+                                  urlCtrl.clear();
+                                });
+                              }
                             },
                           ),
                         ),
@@ -678,6 +707,140 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                     Navigator.pop(ctx);
                   },
                   child: const Text('Agregar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ── Edit banner dialog ─────────────────────────────────────
+
+  void _editBannerDialog(int index) {
+    final banner = _banners[index];
+    final urlCtrl = TextEditingController();
+    final priceCtrl = TextEditingController(
+        text: banner.customPrice?.toStringAsFixed(0) ?? '');
+    String? selectedProductId = banner.productId;
+    String? pickedImagePath = banner.imagePath;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, ss) {
+            return AlertDialog(
+              title: const Text('Editar Banner'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Current image preview
+                    if (pickedImagePath != null && pickedImagePath!.isNotEmpty)
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: _buildBannerThumbnail(pickedImagePath!, double.infinity, 120),
+                          ),
+                          Positioned(
+                            top: 4, right: 4,
+                            child: GestureDetector(
+                              onTap: () => ss(() => pickedImagePath = null),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      Row(children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.upload_file, size: 18),
+                            label: const Text('Subir imagen'),
+                            onPressed: () async {
+                              final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1920, imageQuality: 80);
+                              if (xfile == null) return;
+                              final url = await _uploadImage(xfile);
+                              if (url != null) {
+                                ss(() {
+                                  pickedImagePath = url;
+                                  urlCtrl.clear();
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ]),
+                    const SizedBox(height: 12),
+                    if (pickedImagePath == null || pickedImagePath!.isEmpty)
+                      TextField(
+                        controller: urlCtrl,
+                        decoration: InputDecoration(
+                          labelText: 'O pegar URL de imagen',
+                          hintText: 'https://...',
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    // Product selector
+                    BlocBuilder<ProductsBloc, ProductsState>(
+                      bloc: _productsBloc,
+                      builder: (_, state) {
+                        if (state is! ProductsLoaded) return const SizedBox.shrink();
+                        return DropdownButtonFormField<String>(
+                          value: selectedProductId,
+                          decoration: InputDecoration(
+                            labelText: 'Vincular producto (opcional)',
+                            prefixIcon: const Icon(Icons.link),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          items: [
+                            const DropdownMenuItem<String>(value: null, child: Text('Ninguno')),
+                            ...state.products.map((p) {
+                              final id = (p['_id'] ?? p['id'] ?? '').toString();
+                              final name = p['name']?.toString() ?? '';
+                              return DropdownMenuItem(value: id, child: Text(name, overflow: TextOverflow.ellipsis));
+                            }),
+                          ],
+                          onChanged: (v) => ss(() => selectedProductId = v),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: 'Precio personalizado (opcional)',
+                        prefixIcon: const Icon(Icons.attach_money),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+                ElevatedButton(
+                  onPressed: () {
+                    final imagePath = pickedImagePath ?? urlCtrl.text.trim();
+                    if (imagePath.isEmpty) return;
+                    final updated = BannerConfig(
+                      imagePath: imagePath,
+                      productId: selectedProductId,
+                      customPrice: double.tryParse(priceCtrl.text),
+                    );
+                    setState(() => _banners[index] = updated);
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Guardar'),
                 ),
               ],
             );

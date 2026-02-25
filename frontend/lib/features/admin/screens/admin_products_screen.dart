@@ -5,10 +5,10 @@ import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart' as dio_pkg;
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:baseshop/core/di/injection.dart';
+import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
 import 'package:baseshop/features/products/bloc/products_bloc.dart';
 import 'package:baseshop/features/products/bloc/products_event.dart';
@@ -1689,23 +1689,25 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
         source: ImageSource.gallery,
         maxWidth: 1200,
         maxHeight: 1200,
-        imageQuality: 85,
+        imageQuality: 80,
       );
       if (picked == null) return null;
 
-      final apiDio = getIt<dio_pkg.Dio>();
-      final baseUrl = apiDio.options.baseUrl; // e.g. http://localhost:3000
-      final token = apiDio.options.headers['Authorization'] ??
-          apiDio.options.headers['authorization'] ?? '';
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(children: [
+              SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+              SizedBox(width: 12),
+              Text('Subiendo imagen...'),
+            ]),
+            duration: Duration(seconds: 30),
+          ),
+        );
+      }
 
-      final uploadDio = dio_pkg.Dio(dio_pkg.BaseOptions(
-        baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 30),
-        headers: {
-          if (token.toString().isNotEmpty) 'Authorization': token,
-        },
-      ));
+      final apiClient = getIt<ApiClient>();
 
       dio_pkg.MultipartFile multipartFile;
       if (kIsWeb) {
@@ -1725,10 +1727,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
         'image': multipartFile,
       });
 
-      final response = await uploadDio.post('/api/products/upload', data: formData);
+      final response = await apiClient.dio.post('/api/products/upload', data: formData);
+
+      if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
       if (response.statusCode == 200 && response.data['url'] != null) {
-        // Replace internal host with gateway URL for access from browser
         String url = response.data['url'].toString();
+        final baseUrl = apiClient.dio.options.baseUrl;
         // If the URL points to the internal products-service, rewrite to gateway
         if (url.contains(':3003')) {
           url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), baseUrl);
@@ -1737,6 +1742,12 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
       }
       return null;
     } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al subir imagen: $e'), backgroundColor: AppTheme.errorColor),
+        );
+      }
       debugPrint('Upload error: $e');
       return null;
     }
