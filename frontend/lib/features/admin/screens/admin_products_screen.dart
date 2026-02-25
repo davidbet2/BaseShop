@@ -102,7 +102,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           ),
         ),
         floatingActionButton: FloatingActionButton(
-          backgroundColor: AppTheme.primaryColor,
+          backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           onPressed: () {
             if (_tabCtrl.index == 0) {
@@ -342,10 +342,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                               fontWeight: FontWeight.w600, fontSize: 14)),
                       const SizedBox(height: 4),
                       Text(_currencyFmt.format(price),
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
-                              color: AppTheme.primaryColor)),
+                              color: Theme.of(context).colorScheme.primary)),
                       const SizedBox(height: 4),
                       Row(children: [
                         _badge(
@@ -925,7 +925,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
@@ -945,7 +945,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                               : Colors.grey.shade400,
                         ),
                         value: isFeatured,
-                        activeColor: AppTheme.primaryColor,
+                        activeColor: Theme.of(context).colorScheme.primary,
                         onChanged: (v) => ss(() => isFeatured = v),
                       ),
                       const SizedBox(height: 20),
@@ -999,7 +999,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                             Navigator.pop(ctx);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryColor,
+                            backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(

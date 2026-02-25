@@ -60,8 +60,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           width: 80, height: 80,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppTheme.primaryColor, Color(0xFFFB923C)],
+                            gradient: LinearGradient(
+                              colors: [Theme.of(context).colorScheme.primary, const Color(0xFFFB923C)],
                               begin: Alignment.topLeft, end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(24),
@@ -77,14 +77,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            color: role == 'admin' ? const Color(0xFFFEF3C7) : AppTheme.primaryColor.withValues(alpha: 0.1),
+                            color: role == 'admin' ? const Color(0xFFFEF3C7) : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             role == 'admin' ? 'Administrador' : 'Cliente',
                             style: TextStyle(
                               fontSize: 12, fontWeight: FontWeight.w600,
-                              color: role == 'admin' ? const Color(0xFFD97706) : AppTheme.primaryColor,
+                              color: role == 'admin' ? const Color(0xFFD97706) : Theme.of(context).colorScheme.primary,
                             ),
                           ),
                         ),
@@ -172,10 +172,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Container(
             width: 100, height: 100,
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_outline_rounded, size: 48, color: AppTheme.primaryColor),
+            child: Icon(Icons.person_outline_rounded, size: 48, color: Theme.of(context).colorScheme.primary),
           ),
           const SizedBox(height: 24),
           const Text('Inicia sesi\u00f3n', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
@@ -352,10 +352,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.shopping_bag_rounded, size: 22, color: AppTheme.primaryColor),
+              child: Icon(Icons.shopping_bag_rounded, size: 22, color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(width: 12),
             const Text('BaseShop', style: TextStyle(fontWeight: FontWeight.w700)),

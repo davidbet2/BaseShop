@@ -8,6 +8,8 @@ import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/router/app_router.dart';
 import 'package:baseshop/core/services/push_notification_service.dart';
+import 'package:baseshop/core/services/store_config_service.dart';
+import 'package:baseshop/core/cubits/store_config_cubit.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_event.dart';
@@ -22,6 +24,9 @@ void main() {
 
   // ── Load tokens (fire and forget on web) ───────────────
   _initApp();
+
+  // ── Pre-load store config (primary color, etc.) ────────
+  getIt<StoreConfigCubit>().loadConfig();
 
   runApp(const MyApp());
 }
@@ -56,23 +61,33 @@ class MyApp extends StatelessWidget {
         BlocProvider<AuthBloc>.value(value: getIt<AuthBloc>()),
         BlocProvider<CartBloc>.value(value: getIt<CartBloc>()),
         BlocProvider<FavoritesBloc>.value(value: getIt<FavoritesBloc>()),
+        BlocProvider<StoreConfigCubit>.value(value: getIt<StoreConfigCubit>()),
       ],
-      child: MaterialApp.router(
-        title: 'BaseShop',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        routerConfig: appRouter,
-        locale: const Locale('es', 'CO'),
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: const [
-          Locale('es', 'CO'),
-          Locale('es'),
-          Locale('en'),
-        ],
+      child: BlocBuilder<StoreConfigCubit, StoreConfigState>(
+        bloc: getIt<StoreConfigCubit>(),
+        builder: (context, configState) {
+          final primaryColor = configState is StoreConfigLoaded
+              ? configState.config.primaryColor
+              : AppTheme.defaultPrimary;
+
+          return MaterialApp.router(
+            title: 'BaseShop',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme(primaryColor),
+            routerConfig: appRouter,
+            locale: const Locale('es', 'CO'),
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('es', 'CO'),
+              Locale('es'),
+              Locale('en'),
+            ],
+          );
+        },
       ),
     );
   }

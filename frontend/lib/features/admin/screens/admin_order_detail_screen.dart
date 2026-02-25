@@ -225,7 +225,7 @@ class _AdminOrderDetailScreenState extends State<AdminOrderDetailScreen> {
                   ElevatedButton(
                     onPressed: () => _showChangeDialog(order),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primaryColor,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10)),

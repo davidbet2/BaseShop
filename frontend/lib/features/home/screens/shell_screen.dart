@@ -71,7 +71,7 @@ class ShellScreen extends StatelessWidget {
                         return Badge(
                           isLabelVisible: count > 0,
                           label: Text('$count'),
-                          backgroundColor: AppTheme.primaryColor,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           child: Icon(item.icon),
                         );
                       },
@@ -82,7 +82,7 @@ class ShellScreen extends StatelessWidget {
                         return Badge(
                           isLabelVisible: count > 0,
                           label: Text('$count'),
-                          backgroundColor: AppTheme.primaryColor,
+                          backgroundColor: Theme.of(context).colorScheme.primary,
                           child: Icon(item.selectedIcon),
                         );
                       },

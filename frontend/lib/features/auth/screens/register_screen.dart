@@ -128,7 +128,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         filled: true, fillColor: const Color(0xFFF3F4F6),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       ),
                       validator: (v) {
@@ -153,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         filled: true, fillColor: const Color(0xFFF3F4F6),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5)),
+                        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5)),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                       ),
                       validator: (v) {
@@ -184,7 +184,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           const Text('\u00bfYa tienes cuenta? ', style: TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
                           GestureDetector(
                             onTap: () => context.go('/login'),
-                            child: const Text('Inicia sesi\u00f3n', style: TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.w700, fontSize: 14)),
+                            child: Text('Inicia sesión', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.w700, fontSize: 14)),
                           ),
                         ],
                       ),
@@ -213,7 +213,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         filled: true, fillColor: const Color(0xFFF3F4F6),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: AppTheme.primaryColor, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: Theme.of(context).colorScheme.primary, width: 1.5)),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
       validator: validator,

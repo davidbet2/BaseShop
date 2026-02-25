@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const dir = path.join(__dirname, 'build', 'web');
-const port = 9090;
+const port = 8080;
 
 const mimes = {
   '.html': 'text/html',

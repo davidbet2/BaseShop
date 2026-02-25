@@ -144,7 +144,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     children: [
                       Container(
                         width: 42, height: 42,
-                        decoration: BoxDecoration(color: AppTheme.primaryColor, borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary, borderRadius: BorderRadius.circular(12)),
                         child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
                       ),
                       if (_activeFilterCount > 0)
@@ -317,16 +317,16 @@ class _ProductsScreenState extends State<ProductsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.08) : null,
+          color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.08) : null,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            if (selected) const Icon(Icons.check_rounded, size: 16, color: AppTheme.primaryColor) else const SizedBox(width: 16),
+            if (selected) Icon(Icons.check_rounded, size: 16, color: Theme.of(context).colorScheme.primary) else const SizedBox(width: 16),
             const SizedBox(width: 8),
             Expanded(child: Text(label, style: TextStyle(
               fontSize: 13, fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppTheme.primaryColor : AppTheme.textPrimary,
+              color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textPrimary,
             ))),
           ],
         ),
@@ -344,9 +344,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
         child: Row(
           children: [
             Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                size: 18, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary),
+                size: 18, color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(fontSize: 13, color: selected ? AppTheme.primaryColor : AppTheme.textPrimary,
+            Text(label, style: TextStyle(fontSize: 13, color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textPrimary,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
           ],
         ),
@@ -480,7 +480,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                     Text(_currency.format(comparePrice),
                       style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, decoration: TextDecoration.lineThrough)),
                   Text(_currency.format(price),
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                 ],
               ),
             ),
@@ -500,7 +500,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
       child: ChoiceChip(
         label: Text(label),
         selected: selected,
-        selectedColor: AppTheme.primaryColor,
+        selectedColor: Theme.of(context).colorScheme.primary,
         backgroundColor: const Color(0xFFF3F4F6),
         labelStyle: TextStyle(color: selected ? Colors.white : AppTheme.textSecondary, fontWeight: FontWeight.w600, fontSize: 13),
         side: BorderSide.none,
@@ -717,9 +717,9 @@ class _ProductsScreenState extends State<ProductsScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor : Colors.white,
+          color: selected ? Theme.of(context).colorScheme.primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppTheme.primaryColor : AppTheme.dividerColor),
+          border: Border.all(color: selected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor),
         ),
         child: Text(label, style: TextStyle(
           fontSize: 13, fontWeight: FontWeight.w600,
@@ -737,18 +737,18 @@ class _ProductsScreenState extends State<ProductsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
         margin: const EdgeInsets.only(bottom: 4),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.08) : null,
+          color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.08) : null,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: selected ? AppTheme.primaryColor : AppTheme.textSecondary),
+            Icon(icon, size: 20, color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
             const SizedBox(width: 12),
             Expanded(child: Text(label, style: TextStyle(
               fontSize: 14, fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AppTheme.primaryColor : AppTheme.textPrimary,
+              color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textPrimary,
             ))),
-            if (selected) const Icon(Icons.check_rounded, size: 20, color: AppTheme.primaryColor),
+            if (selected) Icon(Icons.check_rounded, size: 20, color: Theme.of(context).colorScheme.primary),
           ],
         ),
       ),

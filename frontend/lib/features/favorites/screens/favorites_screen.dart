@@ -197,8 +197,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     const Spacer(),
                     Text(
                       _currencyFormat.format(price),
-                      style: const TextStyle(
-                        color: AppTheme.primaryColor,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                       ),

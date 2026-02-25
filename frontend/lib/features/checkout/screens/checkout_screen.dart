@@ -127,13 +127,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Expanded(
                     child: Container(
                       height: 2,
-                      color: isActive ? AppTheme.primaryColor : const Color(0xFFE5E7EB),
+                      color: isActive ? Theme.of(context).colorScheme.primary : const Color(0xFFE5E7EB),
                     ),
                   ),
                 Container(
                   width: 28, height: 28,
                   decoration: BoxDecoration(
-                    color: isActive ? AppTheme.primaryColor : const Color(0xFFE5E7EB),
+                    color: isActive ? Theme.of(context).colorScheme.primary : const Color(0xFFE5E7EB),
                     shape: BoxShape.circle,
                   ),
                   child: Center(
@@ -189,7 +189,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: selected ? AppTheme.primaryColor : AppTheme.dividerColor.withValues(alpha: 0.5),
+                            color: selected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor.withValues(alpha: 0.5),
                             width: selected ? 2 : 1,
                           ),
                         ),
@@ -197,14 +197,14 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           children: [
                             Icon(
                               selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                              color: selected ? AppTheme.primaryColor : AppTheme.textSecondary, size: 22,
+                              color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary, size: 22,
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Text(addr['label'] ?? 'Dirección', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: selected ? AppTheme.primaryColor : AppTheme.textPrimary)),
+                                  Text(addr['label'] ?? 'Dirección', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textPrimary)),
                                   const SizedBox(height: 2),
                                   Text(addr['name'] ?? '', style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
                                   Text(addr['address'] ?? '', style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
@@ -276,7 +276,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: selected ? AppTheme.primaryColor : AppTheme.dividerColor.withValues(alpha: 0.5),
+                      color: selected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor.withValues(alpha: 0.5),
                       width: selected ? 2 : 1,
                     ),
                   ),
@@ -285,25 +285,25 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       Container(
                         width: 44, height: 44,
                         decoration: BoxDecoration(
-                          color: selected ? AppTheme.primaryColor.withValues(alpha: 0.1) : const Color(0xFFF3F4F6),
+                          color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : const Color(0xFFF3F4F6),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(method['icon'] as IconData, size: 22,
-                          color: selected ? AppTheme.primaryColor : AppTheme.textSecondary),
+                          color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(method['label'] as String, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? AppTheme.primaryColor : AppTheme.textPrimary)),
+                            Text(method['label'] as String, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textPrimary)),
                             Text(method['desc'] as String, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                           ],
                         ),
                       ),
                       Icon(
                         selected ? Icons.check_circle_rounded : Icons.circle_outlined,
-                        color: selected ? AppTheme.primaryColor : AppTheme.textSecondary, size: 22,
+                        color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary, size: 22,
                       ),
                     ],
                   ),
@@ -341,7 +341,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     return BlocBuilder<CartBloc, CartState>(
       builder: (context, cartState) {
         if (cartState is! CartLoaded) {
-          return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
+          return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
         }
         final items = cartState.items;
         final subtotal = cartState.subtotal;
@@ -429,7 +429,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-                              Text(_currency.format(total), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+                              Text(_currency.format(total), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                             ],
                           ),
                         ],
@@ -447,7 +447,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.note_rounded, size: 18, color: AppTheme.primaryColor),
+                            Icon(Icons.note_rounded, size: 18, color: Theme.of(context).colorScheme.primary),
                             const SizedBox(width: 8),
                             Expanded(child: Text(_notes, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary))),
                           ],
@@ -527,13 +527,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         children: [
           Row(
             children: [
-              Icon(icon, size: 18, color: AppTheme.primaryColor),
+              Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
               Expanded(child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary))),
               if (onEdit != null)
                 GestureDetector(
                   onTap: onEdit,
-                  child: const Text('Cambiar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.primaryColor)),
+                  child: Text('Cambiar', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
                 ),
             ],
           ),

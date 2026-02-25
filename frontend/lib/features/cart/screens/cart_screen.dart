@@ -31,7 +31,7 @@ class _CartScreenState extends State<CartScreen> {
         child: BlocBuilder<CartBloc, CartState>(
           builder: (context, state) {
             if (state is CartLoading) {
-              return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
+              return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
             }
             if (state is CartError) {
               return _buildError(state.message);
@@ -40,7 +40,7 @@ class _CartScreenState extends State<CartScreen> {
               return _buildEmpty();
             }
             if (state is! CartLoaded) {
-              return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
+              return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
             }
 
             return Column(
@@ -106,7 +106,7 @@ class _CartScreenState extends State<CartScreen> {
                         children: [
                           const Text('Total', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
                           Text('\$${state.subtotal.toStringAsFixed(0)}',
-                            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                         ],
                       ),
                       const SizedBox(height: 16),
@@ -190,7 +190,7 @@ class _CartScreenState extends State<CartScreen> {
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                   const SizedBox(height: 6),
                   Text('\$${price.toStringAsFixed(0)}',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                 ],
               ),
             ),
@@ -245,10 +245,10 @@ class _CartScreenState extends State<CartScreen> {
           Container(
             width: 100, height: 100,
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.shopping_cart_outlined, size: 48, color: AppTheme.primaryColor),
+            child: Icon(Icons.shopping_cart_outlined, size: 48, color: Theme.of(context).colorScheme.primary),
           ),
           const SizedBox(height: 24),
           const Text('Tu carrito est\u00e1 vac\u00edo', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),

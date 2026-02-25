@@ -108,10 +108,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
               label: Text(entry.value),
               selected: isSelected,
               onSelected: (_) => _onStatusSelected(entry.key),
-              selectedColor: AppTheme.primaryColor.withValues(alpha: 0.15),
-              checkmarkColor: AppTheme.primaryColor,
+              selectedColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+              checkmarkColor: Theme.of(context).colorScheme.primary,
               labelStyle: TextStyle(
-                color: isSelected ? AppTheme.primaryColor : Colors.grey.shade700,
+                color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade700,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
@@ -207,10 +207,10 @@ class _OrdersScreenState extends State<OrdersScreen> {
                   ),
                   Text(
                     _currencyFormat.format(total),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: AppTheme.primaryColor,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                 ],
@@ -246,7 +246,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
       case 'pending':
         return _StatusConfig('Pendiente', Colors.orange);
       case 'confirmed':
-        return _StatusConfig('Confirmado', AppTheme.primaryColor);
+        return _StatusConfig('Confirmado', Theme.of(context).colorScheme.primary);
       case 'processing':
         return _StatusConfig('Procesando', Colors.blue);
       case 'shipped':

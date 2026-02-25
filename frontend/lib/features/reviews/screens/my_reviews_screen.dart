@@ -35,7 +35,7 @@ class _MyReviewsScreenState extends State<MyReviewsScreen> {
       body: BlocBuilder<ReviewsBloc, ReviewsState>(
         builder: (context, state) {
           if (state is ReviewsLoading) {
-            return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
+            return Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary));
           }
           if (state is ReviewsError) {
             return _buildError(state.message);

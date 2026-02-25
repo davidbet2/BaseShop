@@ -206,7 +206,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             const SizedBox(height: 8),
             Card(
               child: ListTile(
-                leading: const Icon(Icons.payment, color: AppTheme.primaryColor),
+                leading: Icon(Icons.payment, color: Theme.of(context).colorScheme.primary),
                 title: Text(_formatPaymentMethod(paymentMethod)),
               ),
             ),
@@ -307,9 +307,9 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
             Text(
               _currencyFormat.format(price * quantity),
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: AppTheme.primaryColor,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ],
@@ -337,7 +337,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             style: TextStyle(
               fontSize: bold ? 18 : 14,
               fontWeight: bold ? FontWeight.bold : FontWeight.w500,
-              color: bold ? AppTheme.primaryColor : null,
+              color: bold ? Theme.of(context).colorScheme.primary : null,
             ),
           ),
         ],
@@ -471,7 +471,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       case 'pending':
         return _StatusConfig('Pendiente', Colors.orange);
       case 'confirmed':
-        return _StatusConfig('Confirmado', AppTheme.primaryColor);
+        return _StatusConfig('Confirmado', Theme.of(context).colorScheme.primary);
       case 'processing':
         return _StatusConfig('Procesando', Colors.blue);
       case 'shipped':

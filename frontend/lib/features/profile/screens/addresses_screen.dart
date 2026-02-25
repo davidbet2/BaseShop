@@ -50,11 +50,11 @@ class _AddressesScreenState extends State<AddressesScreen> {
         onPressed: _showAddDialog,
         icon: const Icon(Icons.add_rounded),
         label: const Text('Agregar'),
-        backgroundColor: AppTheme.primaryColor,
+        backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
+          ? Center(child: CircularProgressIndicator(color: Theme.of(context).colorScheme.primary))
           : _addresses.isEmpty
               ? _buildEmpty()
               : _buildList(),
@@ -75,7 +75,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isDefault ? AppTheme.primaryColor.withValues(alpha: 0.5) : AppTheme.dividerColor.withValues(alpha: 0.5),
+              color: isDefault ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5) : AppTheme.dividerColor.withValues(alpha: 0.5),
               width: isDefault ? 2 : 1,
             ),
           ),
@@ -85,14 +85,14 @@ class _AddressesScreenState extends State<AddressesScreen> {
               Row(
                 children: [
                   Icon(Icons.location_on_rounded, size: 20,
-                    color: isDefault ? AppTheme.primaryColor : AppTheme.textSecondary),
+                    color: isDefault ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       addr['label'] ?? 'Dirección',
                       style: TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w700,
-                        color: isDefault ? AppTheme.primaryColor : AppTheme.textPrimary,
+                        color: isDefault ? Theme.of(context).colorScheme.primary : AppTheme.textPrimary,
                       ),
                     ),
                   ),
@@ -100,10 +100,10 @@ class _AddressesScreenState extends State<AddressesScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text('Principal', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.primaryColor)),
+                      child: Text('Principal', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Theme.of(context).colorScheme.primary)),
                     ),
                   PopupMenuButton<String>(
                     onSelected: (val) => _handleMenu(val, i),

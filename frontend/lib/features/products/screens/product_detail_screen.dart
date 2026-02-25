@@ -234,7 +234,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(10),
                                         border: Border.all(
-                                          color: selected ? AppTheme.primaryColor : AppTheme.dividerColor,
+                                          color: selected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor,
                                           width: selected ? 2.5 : 1,
                                         ),
                                       ),
@@ -271,7 +271,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Text(_currency.format(price),
-                                style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+                                style: TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                               if (hasDiscount) ...[
                                 const SizedBox(width: 12),
                                 Padding(
@@ -474,7 +474,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(_currency.format(price),
-                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.primaryColor)),
+                          style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Theme.of(context).colorScheme.primary)),
                         if (hasDiscount) ...[
                           const SizedBox(width: 10),
                           Padding(
@@ -578,8 +578,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 margin: const EdgeInsets.only(right: 12),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle, color: color,
-                  border: Border.all(color: isSelected ? AppTheme.primaryColor : AppTheme.dividerColor, width: isSelected ? 3 : 1),
-                  boxShadow: isSelected ? [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.3), blurRadius: 8)] : null,
+                  border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor, width: isSelected ? 3 : 1),
+                  boxShadow: isSelected ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8)] : null,
                 ),
                 child: isSelected ? Icon(Icons.check_rounded, size: 18, color: color.computeLuminance() > 0.5 ? AppTheme.textPrimary : Colors.white) : null,
               ),
@@ -608,10 +608,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 duration: const Duration(milliseconds: 200),
                 padding: EdgeInsets.symmetric(horizontal: variantType == _VariantType.electronics ? 18 : 16, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primaryColor : Colors.white,
+                  color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isSelected ? AppTheme.primaryColor : AppTheme.dividerColor, width: isSelected ? 2 : 1),
-                  boxShadow: isSelected ? [BoxShadow(color: AppTheme.primaryColor.withValues(alpha: 0.2), blurRadius: 8)] : null,
+                  border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor, width: isSelected ? 2 : 1),
+                  boxShadow: isSelected ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2), blurRadius: 8)] : null,
                 ),
                 child: Text(size, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppTheme.textPrimary)),
               ),
@@ -736,10 +736,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             Container(
               width: 48, height: 48,
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.shopping_bag_outlined, color: AppTheme.primaryColor, size: 24),
+              child: Icon(Icons.shopping_bag_outlined, color: Theme.of(context).colorScheme.primary, size: 24),
             ),
             const SizedBox(height: 16),
             const Text('Inicia sesión para comprar', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
@@ -759,8 +759,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               width: double.infinity, height: 52,
               child: OutlinedButton(
                 onPressed: () { Navigator.pop(ctx); context.push('/register'); },
-                style: OutlinedButton.styleFrom(side: BorderSide(color: AppTheme.primaryColor.withValues(alpha: 0.3)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                child: const Text('Crear cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.primaryColor)),
+                style: OutlinedButton.styleFrom(side: BorderSide(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3)), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                child: Text('Crear cuenta', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.primary)),
               ),
             ),
             const SizedBox(height: 8),

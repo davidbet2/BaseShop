@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // ── Warm orange palette (inspired by modern e-commerce UIs) ──
-  static const Color primaryColor = Color(0xFFF97316);   // Orange-500
+  // ── Default warm orange palette (inspired by modern e-commerce UIs) ──
+  static const Color defaultPrimary = Color(0xFFF97316);  // Orange-500
+
+  // ── Kept for backward-compat: use Theme.of(context).colorScheme.primary when possible ──
+  static const Color primaryColor = defaultPrimary;
   static const Color primaryLight = Color(0xFFFDBA74);   // Orange-300
   static const Color primaryDark = Color(0xFFEA580C);    // Orange-600
   static const Color accentColor = Color(0xFFF97316);
@@ -15,16 +18,17 @@ class AppTheme {
   static const Color textSecondary = Color(0xFF6B7280);
   static const Color dividerColor = Color(0xFFE5E7EB);
 
-  static ThemeData get lightTheme {
+  static ThemeData lightTheme([Color? primary]) {
+    final seedColor = primary ?? defaultPrimary;
     final base = GoogleFonts.interTextTheme();
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: primaryColor,
-        primary: primaryColor,
+        seedColor: seedColor,
+        primary: seedColor,
         onPrimary: Colors.white,
-        secondary: primaryDark,
+        secondary: HSLColor.fromColor(seedColor).withLightness(0.35).toColor(),
         surface: surfaceColor,
         error: errorColor,
       ),
@@ -61,7 +65,7 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: primaryColor,
+          backgroundColor: seedColor,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
@@ -76,8 +80,8 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primaryColor,
-          side: BorderSide(color: primaryColor.withValues(alpha: 0.5)),
+          foregroundColor: seedColor,
+          side: BorderSide(color: seedColor.withValues(alpha: 0.5)),
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
@@ -86,7 +90,7 @@ class AppTheme {
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: primaryColor,
+          foregroundColor: seedColor,
           textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
         ),
       ),
@@ -104,7 +108,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: primaryColor, width: 2),
+          borderSide: BorderSide(color: seedColor, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -123,13 +127,13 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: surfaceColor,
-        indicatorColor: primaryColor.withValues(alpha: 0.12),
+        indicatorColor: seedColor.withValues(alpha: 0.12),
         elevation: 0,
         height: 68,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return GoogleFonts.inter(
-              fontSize: 11, fontWeight: FontWeight.w600, color: primaryColor,
+              fontSize: 11, fontWeight: FontWeight.w600, color: seedColor,
             );
           }
           return GoogleFonts.inter(
@@ -138,14 +142,14 @@ class AppTheme {
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const IconThemeData(size: 24, color: primaryColor);
+            return IconThemeData(size: 24, color: seedColor);
           }
           return const IconThemeData(size: 24, color: textSecondary);
         }),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: const Color(0xFFF3F4F6),
-        selectedColor: primaryColor.withValues(alpha: 0.15),
+        selectedColor: seedColor.withValues(alpha: 0.15),
         labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
@@ -158,8 +162,8 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      floatingActionButtonTheme: const FloatingActionButtonThemeData(
-        backgroundColor: primaryColor,
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: seedColor,
         foregroundColor: Colors.white,
         elevation: 2,
       ),

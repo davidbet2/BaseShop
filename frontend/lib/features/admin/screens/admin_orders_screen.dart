@@ -202,10 +202,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             child: FilterChip(
               label: Text(e.value),
               selected: sel,
-              selectedColor: AppTheme.primaryColor.withOpacity(0.15),
-              checkmarkColor: AppTheme.primaryColor,
+              selectedColor: Theme.of(context).colorScheme.primary.withOpacity(0.15),
+              checkmarkColor: Theme.of(context).colorScheme.primary,
               labelStyle: TextStyle(
-                color: sel ? AppTheme.primaryColor : Colors.grey.shade700,
+                color: sel ? Theme.of(context).colorScheme.primary : Colors.grey.shade700,
                 fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
               ),
               onSelected: (_) => _onFilterChanged(e.key),
@@ -402,10 +402,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 children: [
                   Text(
                     _currencyFmt.format(total),
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: AppTheme.primaryColor),
+                        color: Theme.of(context).colorScheme.primary),
                   ),
                   if (nextStatuses.isNotEmpty)
                     _miniActionBtn(order, nextStatuses),

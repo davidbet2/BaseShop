@@ -112,7 +112,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final items = <_StatItem>[
       _StatItem(
         icon: Icons.assignment_rounded,
-        color: AppTheme.primaryColor,
+        color: Theme.of(context).colorScheme.primary,
         value: totalOrders.toString(),
         label: 'Total Pedidos',
       ),
