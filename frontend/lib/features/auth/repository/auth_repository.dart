@@ -63,16 +63,25 @@ class AuthRepository {
 
   // ── Google Sign-In ─────────────────────────────────────────
   Future<Map<String, dynamic>?> googleSignIn() async {
-    final googleUser = await GoogleSignIn(scopes: ['email']).signIn();
+    final googleUser = await GoogleSignIn(
+      clientId: '523139154121-19e2a8br6ce22mabnn1h2jk1jrg38srs.apps.googleusercontent.com',
+      scopes: ['email'],
+    ).signIn();
     if (googleUser == null) return null; // user cancelled
 
     final googleAuth = await googleUser.authentication;
     final idToken = googleAuth.idToken;
-    if (idToken == null) throw Exception('No se obtuvo el token de Google');
+    final accessToken = googleAuth.accessToken;
+    if (idToken == null && accessToken == null) {
+      throw Exception('No se obtuvo el token de Google');
+    }
 
     final response = await _apiClient.dio.post(
       ApiConstants.googleSignIn,
-      data: {'idToken': idToken},
+      data: {
+        if (idToken != null) 'id_token': idToken,
+        if (accessToken != null) 'access_token': accessToken,
+      },
     );
 
     final data = response.data as Map<String, dynamic>;

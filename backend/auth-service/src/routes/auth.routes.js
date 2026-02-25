@@ -150,15 +150,28 @@ module.exports = (authLimiter) => {
     verifyRecaptcha,
     async (req, res) => {
       try {
-        const { id_token } = req.body;
-        if (!id_token) {
+        const { id_token, access_token } = req.body;
+        if (!id_token && !access_token) {
           return res.status(400).json({ error: 'Token de Google requerido' });
         }
 
-        // Verificar token con Google
+        // Verificar token con Google (id_token o access_token)
         const axios = require('axios');
-        const googleResponse = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${id_token}`);
-        const { email, given_name, family_name, picture, sub } = googleResponse.data;
+        let googleData;
+        if (id_token) {
+          const resp = await axios.get(`https://oauth2.googleapis.com/tokeninfo?id_token=${id_token}`);
+          googleData = resp.data;
+        } else {
+          const resp = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${access_token}` },
+          });
+          googleData = resp.data;
+        }
+        const email = googleData.email;
+        const given_name = googleData.given_name || googleData.name || '';
+        const family_name = googleData.family_name || '';
+        const picture = googleData.picture || '';
+        const sub = googleData.sub || '';
 
         if (!email) {
           return res.status(400).json({ error: 'No se pudo obtener el email de Google' });
