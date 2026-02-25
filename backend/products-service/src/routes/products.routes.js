@@ -1,8 +1,33 @@
 const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const { getDb } = require('../database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
+
+// ── Multer config for image uploads ──
+const UPLOADS_DIR = path.resolve(process.env.UPLOADS_PATH || './data/uploads');
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `${uuidv4()}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowed = /jpeg|jpg|png|gif|webp|svg/;
+    const ext = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mime = allowed.test(file.mimetype);
+    cb(null, ext && mime);
+  },
+});
 
 const productsRouter = express.Router();
 const categoriesRouter = express.Router();
@@ -134,6 +159,23 @@ function buildCategoryTree(categories, parentId = null) {
 // ══════════════════════════════════════════════
 //  PRODUCTS ROUTES
 // ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// POST /api/products/upload — Subir una imagen (admin)
+// ──────────────────────────────────────────────
+productsRouter.post('/upload',
+  authMiddleware,
+  roleMiddleware('admin'),
+  upload.single('image'),
+  (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No se proporcionó ninguna imagen válida' });
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const url = `${baseUrl}/uploads/${req.file.filename}`;
+    res.json({ url, filename: req.file.filename });
+  }
+);
 
 // ──────────────────────────────────────────────
 // GET /api/products — Listar productos (público)

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:baseshop/core/utils/web_favicon.dart';
 
@@ -18,8 +19,25 @@ import 'package:baseshop/features/auth/bloc/auth_event.dart';
 import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/favorites/bloc/favorites_bloc.dart';
 
-void main() {
+/// Cached values loaded from SharedPreferences before runApp.
+/// Used as fallback while the API config loads to prevent color flash.
+Color _cachedPrimaryColor = AppTheme.defaultPrimary;
+String _cachedStoreName = 'BaseShop';
+String _cachedStoreLogo = '';
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // ── Read cached config BEFORE anything renders ──────────
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final hex = prefs.getString('cached_primary_color_hex');
+    if (hex != null && hex.isNotEmpty) {
+      _cachedPrimaryColor = Color(int.parse('FF$hex', radix: 16));
+    }
+    _cachedStoreName = prefs.getString('cached_store_name') ?? 'BaseShop';
+    _cachedStoreLogo = prefs.getString('cached_store_logo') ?? '';
+  } catch (_) {}
 
   // ── Dependency injection ─────────────────────────────
   configureDependencies();
@@ -70,15 +88,15 @@ class MyApp extends StatelessWidget {
         builder: (context, configState) {
           final primaryColor = configState is StoreConfigLoaded
               ? configState.config.primaryColor
-              : AppTheme.defaultPrimary;
+              : _cachedPrimaryColor;
 
           // Dynamic favicon + tab title on web
           final storeName = configState is StoreConfigLoaded
               ? configState.config.storeName
-              : 'BaseShop';
+              : _cachedStoreName;
           final storeLogo = configState is StoreConfigLoaded
               ? configState.config.storeLogo
-              : '';
+              : _cachedStoreLogo;
           if (kIsWeb) {
             updateWebFavicon(storeLogo);
             updateWebTitle(storeName);

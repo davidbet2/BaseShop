@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:baseshop/core/services/store_config_service.dart';
 
 class StoreConfigCubit extends Cubit<StoreConfigState> {
@@ -14,9 +15,24 @@ class StoreConfigCubit extends Cubit<StoreConfigState> {
     try {
       final config = await _service.getConfig();
       emit(StoreConfigLoaded(config));
+      // Cache config values for instant startup next time (no color flash)
+      _cacheConfig(config);
     } catch (e) {
-      emit(StoreConfigError(e.toString()));
+      if (state is! StoreConfigLoaded) {
+        emit(StoreConfigError(e.toString()));
+      }
     }
+  }
+
+  /// Persists essential config values to SharedPreferences so the next
+  /// app launch can use them immediately instead of showing default orange.
+  Future<void> _cacheConfig(StoreConfig config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_primary_color_hex', config.primaryColorHex);
+      await prefs.setString('cached_store_name', config.storeName);
+      await prefs.setString('cached_store_logo', config.storeLogo);
+    } catch (_) {}
   }
 
   Future<void> updateConfig({
@@ -44,6 +60,7 @@ class StoreConfigCubit extends Cubit<StoreConfigState> {
         banners: banners,
       );
       emit(StoreConfigLoaded(config));
+      _cacheConfig(config);
     } catch (e) {
       emit(StoreConfigError(e.toString()));
     }

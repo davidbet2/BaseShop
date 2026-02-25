@@ -109,6 +109,12 @@ app.use('/api/products', createProxyMiddleware({
   pathRewrite: { '^/': '/api/products/' },
 }));
 
+// Static uploads from products-service
+app.use('/uploads', createProxyMiddleware({
+  ...proxyOptions(process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003'),
+  pathRewrite: { '^/': '/uploads/' },
+}));
+
 app.use('/api/categories', createProxyMiddleware({
   ...proxyOptions(process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003'),
   pathRewrite: { '^/': '/api/categories/' },

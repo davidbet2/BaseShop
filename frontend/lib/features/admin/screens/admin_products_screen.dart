@@ -3,6 +3,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart' as dio_pkg;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
@@ -985,7 +989,24 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12)),
                           ),
-                          child: const Text('Agregar'),
+                          child: const Text('Agregar URL'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final url = await _pickAndUploadImage();
+                            if (url != null) {
+                              ss(() => images.add(url));
+                            }
+                          },
+                          icon: const Icon(Icons.upload_file, size: 18),
+                          label: const Text('Subir'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
                         ),
                       ]),
                       const SizedBox(height: 12),
@@ -1409,71 +1430,121 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   ) {
     final nameCtrl = TextEditingController();
     final priceCtrl = TextEditingController(text: '0');
-    final imageCtrl = TextEditingController();
+    String variantImageUrl = '';
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Nueva opción de ${variants[typeIdx]['name']}'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                autofocus: true,
-                decoration: InputDecoration(
-                  labelText: 'Nombre (ej: Rojo, XL, 256GB)',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Nueva opción de ${variants[typeIdx]['name']}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre (ej: Rojo, XL, 256GB)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Ajuste de precio (+/-)',
-                  helperText: 'Ej: 50000 agrega al precio base, -10000 resta',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Ajuste de precio (+/-)',
+                    helperText: 'Ej: 50000 agrega al precio base, -10000 resta',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: imageCtrl,
-                decoration: InputDecoration(
-                  labelText: 'URL imagen (opcional)',
-                  helperText: 'Para que la imagen cambie al seleccionar',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 12),
+                // Image upload section
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Imagen (opcional)',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600)),
+                      const SizedBox(height: 8),
+                      if (variantImageUrl.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(variantImageUrl,
+                              width: 80, height: 80, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _imgPlaceholder(80)),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Row(children: [
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final url = await _pickAndUploadImage();
+                            if (url != null) {
+                              setDialogState(() => variantImageUrl = url);
+                            }
+                          },
+                          icon: const Icon(Icons.upload_file, size: 16),
+                          label: Text(variantImageUrl.isEmpty
+                              ? 'Subir imagen'
+                              : 'Cambiar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        if (variantImageUrl.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () =>
+                                setDialogState(() => variantImageUrl = ''),
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.red, size: 20),
+                          ),
+                        ],
+                      ]),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () {
-              if (nameCtrl.text.trim().isEmpty) return;
-              Navigator.pop(ctx);
-              ss(() {
-                final options =
-                    variants[typeIdx]['options'] as List<Map<String, dynamic>>;
-                options.add({
-                  'name': nameCtrl.text.trim(),
-                  'price_adjustment':
-                      double.tryParse(priceCtrl.text) ?? 0.0,
-                  'image': imageCtrl.text.trim(),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () {
+                if (nameCtrl.text.trim().isEmpty) return;
+                Navigator.pop(ctx);
+                ss(() {
+                  final options =
+                      variants[typeIdx]['options'] as List<Map<String, dynamic>>;
+                  options.add({
+                    'name': nameCtrl.text.trim(),
+                    'price_adjustment':
+                        double.tryParse(priceCtrl.text) ?? 0.0,
+                    'image': variantImageUrl,
+                  });
                 });
-              });
-            },
-            child: const Text('Agregar'),
-          ),
-        ],
+              },
+              child: const Text('Agregar'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1489,67 +1560,118 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     final nameCtrl = TextEditingController(text: opt['name'] as String);
     final priceCtrl = TextEditingController(
         text: (opt['price_adjustment'] as num?)?.toString() ?? '0');
-    final imageCtrl = TextEditingController(text: opt['image'] as String? ?? '');
+    String variantImageUrl = opt['image'] as String? ?? '';
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Editar opción'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Nombre',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Editar opción'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Nombre',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: 'Ajuste de precio (+/-)',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Ajuste de precio (+/-)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: imageCtrl,
-                decoration: InputDecoration(
-                  labelText: 'URL imagen (opcional)',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                const SizedBox(height: 12),
+                // Image upload section
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Imagen (opcional)',
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600)),
+                      const SizedBox(height: 8),
+                      if (variantImageUrl.isNotEmpty) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.network(variantImageUrl,
+                              width: 80, height: 80, fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _imgPlaceholder(80)),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      Row(children: [
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final url = await _pickAndUploadImage();
+                            if (url != null) {
+                              setDialogState(() => variantImageUrl = url);
+                            }
+                          },
+                          icon: const Icon(Icons.upload_file, size: 16),
+                          label: Text(variantImageUrl.isEmpty
+                              ? 'Subir imagen'
+                              : 'Cambiar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                        ),
+                        if (variantImageUrl.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          IconButton(
+                            onPressed: () =>
+                                setDialogState(() => variantImageUrl = ''),
+                            icon: const Icon(Icons.delete_outline,
+                                color: Colors.red, size: 20),
+                          ),
+                        ],
+                      ]),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                ss(() {
+                  final options =
+                      variants[typeIdx]['options'] as List<Map<String, dynamic>>;
+                  options[optIdx] = {
+                    'name': nameCtrl.text.trim(),
+                    'price_adjustment':
+                        double.tryParse(priceCtrl.text) ?? 0.0,
+                    'image': variantImageUrl,
+                  };
+                });
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancelar')),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              ss(() {
-                final options =
-                    variants[typeIdx]['options'] as List<Map<String, dynamic>>;
-                options[optIdx] = {
-                  'name': nameCtrl.text.trim(),
-                  'price_adjustment':
-                      double.tryParse(priceCtrl.text) ?? 0.0,
-                  'image': imageCtrl.text.trim(),
-                };
-              });
-            },
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
   }
@@ -1557,6 +1679,68 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   // ══════════════════════════════════════════════════════════
   // ── HELPERS ───────────────────────────────────────────────
   // ══════════════════════════════════════════════════════════
+
+  /// Pick an image from device and upload it to the backend.
+  /// Returns the URL of the uploaded image, or null if cancelled/failed.
+  Future<String?> _pickAndUploadImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 85,
+      );
+      if (picked == null) return null;
+
+      final apiDio = getIt<dio_pkg.Dio>();
+      final baseUrl = apiDio.options.baseUrl; // e.g. http://localhost:3000
+      final token = apiDio.options.headers['Authorization'] ??
+          apiDio.options.headers['authorization'] ?? '';
+
+      final uploadDio = dio_pkg.Dio(dio_pkg.BaseOptions(
+        baseUrl: baseUrl,
+        connectTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 30),
+        headers: {
+          if (token.toString().isNotEmpty) 'Authorization': token,
+        },
+      ));
+
+      dio_pkg.MultipartFile multipartFile;
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        multipartFile = dio_pkg.MultipartFile.fromBytes(
+          bytes,
+          filename: picked.name,
+        );
+      } else {
+        multipartFile = await dio_pkg.MultipartFile.fromFile(
+          picked.path,
+          filename: picked.name,
+        );
+      }
+
+      final formData = dio_pkg.FormData.fromMap({
+        'image': multipartFile,
+      });
+
+      final response = await uploadDio.post('/api/products/upload', data: formData);
+      if (response.statusCode == 200 && response.data['url'] != null) {
+        // Replace internal host with gateway URL for access from browser
+        String url = response.data['url'].toString();
+        // If the URL points to the internal products-service, rewrite to gateway
+        if (url.contains(':3003')) {
+          url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), baseUrl);
+        }
+        return url;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Upload error: $e');
+      return null;
+    }
+  }
 
   String _extractFirstImage(Map<String, dynamic> product) {
     final images = product['images'];

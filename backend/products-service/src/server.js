@@ -67,6 +67,11 @@ async function start() {
   await initDatabase();
 
   const productsRoutes = require('./routes/products.routes');
+  // ── Serve uploaded images ──
+  const path = require('path');
+  const UPLOADS_DIR = path.resolve(process.env.UPLOADS_PATH || './data/uploads');
+  app.use('/uploads', require('express').static(UPLOADS_DIR));
+
   app.use('/api/products', productsRoutes.productsRouter);
   app.use('/api/categories', productsRoutes.categoriesRouter);
 
