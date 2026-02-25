@@ -44,6 +44,33 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <!-- reCAPTCHA v3 -->
+  <script src="https://www.google.com/recaptcha/api.js?render=6Lfu5ncsAAAAABIBMAip82uFsPoiRyrmYOuQiDlq"></script>
+  <script>
+    function executeRecaptcha(action) {
+      console.log('[reCAPTCHA-JS] executeRecaptcha called with action:', action);
+      return new Promise(function(resolve, reject) {
+        if (typeof grecaptcha === 'undefined') {
+          console.error('[reCAPTCHA-JS] grecaptcha not loaded');
+          reject(new Error('grecaptcha not loaded'));
+          return;
+        }
+        grecaptcha.ready(function() {
+          console.log('[reCAPTCHA-JS] grecaptcha ready, executing...');
+          grecaptcha.execute('6Lfu5ncsAAAAABIBMAip82uFsPoiRyrmYOuQiDlq', { action: action })
+            .then(function(token) {
+              console.log('[reCAPTCHA-JS] Token obtained:', token ? token.substring(0, 20) + '...' : 'EMPTY');
+              resolve(token);
+            })
+            .catch(function(e) {
+              console.error('[reCAPTCHA-JS] Execute error:', e);
+              reject(e);
+            });
+        });
+      });
+    }
+  </script>
+
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

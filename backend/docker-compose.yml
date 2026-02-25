@@ -39,6 +39,7 @@ services:
       - ADMIN_EMAIL=admin@baseshop.com
       - ADMIN_PASSWORD=Admin123!
       - ALLOWED_ORIGINS=http://localhost:9090,http://localhost:8080,http://localhost:3000
+      - RECAPTCHA_SECRET_KEY=6Lfu5ncsAAAAAOePV4puBN9QaHlpREPmjxzqpDld
     volumes: [auth-data:/app/data]
     networks: [baseshop-network]
     restart: unless-stopped

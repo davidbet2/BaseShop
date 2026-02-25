@@ -76,11 +76,14 @@ class AuthRepository {
       throw Exception('No se obtuvo el token de Google');
     }
 
+    final recaptchaToken = await RecaptchaService.execute('google_signin');
+
     final response = await _apiClient.dio.post(
       ApiConstants.googleSignIn,
       data: {
         if (idToken != null) 'id_token': idToken,
         if (accessToken != null) 'access_token': accessToken,
+        'recaptchaToken': recaptchaToken,
       },
     );
 
