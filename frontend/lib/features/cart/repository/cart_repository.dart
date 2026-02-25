@@ -38,17 +38,22 @@ class CartRepository {
     String productName,
     double productPrice,
     String productImage,
-    int quantity,
-  ) async {
+    int quantity, {
+    Map<String, String>? selectedVariants,
+  }) async {
+    final data = <String, dynamic>{
+      'product_id': productId,
+      'product_name': productName,
+      'product_price': productPrice,
+      'product_image': productImage,
+      'quantity': quantity,
+    };
+    if (selectedVariants != null && selectedVariants.isNotEmpty) {
+      data['selected_variants'] = selectedVariants;
+    }
     final response = await _apiClient.dio.post(
       ApiConstants.cartItems,
-      data: {
-        'product_id': productId,
-        'product_name': productName,
-        'product_price': productPrice,
-        'product_image': productImage,
-        'quantity': quantity,
-      },
+      data: data,
     );
     return Map<String, dynamic>.from(response.data ?? {});
   }

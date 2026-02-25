@@ -28,22 +28,14 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   int _quantity = 1;
-  String? _selectedSize;
-  int _selectedColorIndex = 0;
   final _currency = NumberFormat.currency(locale: 'es_CO', symbol: '\$', decimalDigits: 0);
   final PageController _imageCtrl = PageController();
   int _currentImagePage = 0;
   int _selectedThumbIndex = 0;
 
-  static const _clothingSizes = ['XS', 'S', 'M', 'L', 'XL'];
-  static const _shoeSizes = ['36', '37', '38', '39', '40', '41', '42', '43', '44'];
-  static const _electronicsStorage = ['128GB', '256GB', '512GB', '1TB'];
-  static const _defaultColors = [
-    {'name': 'Negro', 'color': Color(0xFF1F2937)},
-    {'name': 'Blanco', 'color': Color(0xFFF9FAFB)},
-    {'name': 'Azul', 'color': Color(0xFF3B82F6)},
-    {'name': 'Rojo', 'color': Color(0xFFEF4444)},
-  ];
+  // Dynamic variant selections: variantTypeName -> selected option map
+  final Map<String, Map<String, dynamic>> _selectedVariants = {};
+  bool _variantsInitialized = false;
 
   @override
   void initState() {
@@ -61,14 +53,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.dispose();
   }
 
-  _VariantType _getVariantType(List<String> tags) {
-    final joined = tags.join(' ').toLowerCase();
-    if (joined.contains('zapatillas') || joined.contains('running') || joined.contains('zapato')) return _VariantType.shoes;
-    if (joined.contains('ropa') || joined.contains('camiseta') || joined.contains('vestido') ||
-        joined.contains('jeans') || joined.contains('chaqueta') || joined.contains('deportiva')) return _VariantType.clothing;
-    if (joined.contains('smartphone') || joined.contains('iphone') || joined.contains('galaxy') ||
-        joined.contains('laptop') || joined.contains('macbook')) return _VariantType.electronics;
-    return _VariantType.none;
+  // Initialize variant selections with first option of each type
+  void _initVariants(List<dynamic> variants) {
+    if (_variantsInitialized || variants.isEmpty) return;
+    _variantsInitialized = true;
+    for (final v in variants) {
+      final typeName = v['name'] as String? ?? '';
+      final options = v['options'] as List? ?? [];
+      if (options.isNotEmpty && !_selectedVariants.containsKey(typeName)) {
+        _selectedVariants[typeName] = Map<String, dynamic>.from(options.first as Map);
+      }
+    }
+  }
+
+  // Compute total price adjustment from all selected variants
+  double _computePriceAdjustment() {
+    double adj = 0;
+    for (final opt in _selectedVariants.values) {
+      adj += (opt['price_adjustment'] as num?)?.toDouble() ?? 0;
+    }
+    return adj;
+  }
+
+  // Get variant override image (returns first non-empty image from selected variants)
+  String? _getVariantImage() {
+    for (final opt in _selectedVariants.values) {
+      final img = opt['image'] as String? ?? '';
+      if (img.isNotEmpty) return img;
+    }
+    return null;
   }
 
   @override
@@ -88,38 +101,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           final name = (p['name'] ?? '').toString();
           final shortDesc = (p['short_description'] ?? '').toString();
           final description = (p['description'] ?? '').toString();
-          final price = (p['price'] as num?)?.toDouble() ?? 0;
-          final comparePrice = (p['compare_price'] as num?)?.toDouble() ?? 0;
+          final originalPrice = (p['original_price'] as num?)?.toDouble() ?? (p['price'] as num?)?.toDouble() ?? 0;
+          final discountPercent = (p['discount_percent'] as num?)?.toDouble() ?? 0;
           final stock = (p['stock'] as num?)?.toInt() ?? 0;
           final tags = (p['tags'] is List) ? (p['tags'] as List).map((e) => e.toString()).toList() : <String>[];
-          final hasDiscount = comparePrice > price && comparePrice > 0;
-          final discountPct = hasDiscount ? ((comparePrice - price) / comparePrice * 100).round() : 0;
-          final variantType = _getVariantType(tags);
+          final hasVariants = p['has_variants'] == true || p['has_variants'] == 1;
+          final variants = (p['variants'] is List) ? p['variants'] as List : [];
 
-          if (_selectedSize == null) {
-            switch (variantType) {
-              case _VariantType.clothing: _selectedSize = 'M'; break;
-              case _VariantType.shoes: _selectedSize = '40'; break;
-              case _VariantType.electronics: _selectedSize = '256GB'; break;
-              case _VariantType.none: break;
-            }
-          }
+          // Initialize variant selections
+          if (hasVariants) _initVariants(variants);
+
+          // Compute effective price with variant adjustments on original price
+          final priceAdj = _computePriceAdjustment();
+          final adjustedOriginal = originalPrice + priceAdj;
+          final hasDiscount = discountPercent > 0;
+          final price = hasDiscount
+              ? (adjustedOriginal * (1 - discountPercent / 100))
+              : adjustedOriginal;
+          final comparePrice = hasDiscount ? adjustedOriginal : 0.0;
+          final discountPct = hasDiscount ? discountPercent.round() : 0;
+
+          // Override image from variant selection
+          final variantImage = _getVariantImage();
+          final displayImageUrl = variantImage ?? imageUrl;
 
           return LayoutBuilder(builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 900;
             if (isWide) {
               return _buildWideLayout(
-                images: images, imageUrl: imageUrl, name: name, shortDesc: shortDesc,
+                images: images, imageUrl: displayImageUrl, name: name, shortDesc: shortDesc,
                 description: description, price: price, comparePrice: comparePrice,
                 stock: stock, tags: tags, hasDiscount: hasDiscount, discountPct: discountPct,
-                variantType: variantType, maxWidth: constraints.maxWidth,
+                variants: variants, hasVariantData: hasVariants, maxWidth: constraints.maxWidth,
               );
             }
             return _buildMobileLayout(
-              images: images, imageUrl: imageUrl, name: name, shortDesc: shortDesc,
+              images: images, imageUrl: displayImageUrl, name: name, shortDesc: shortDesc,
               description: description, price: price, comparePrice: comparePrice,
               stock: stock, tags: tags, hasDiscount: hasDiscount, discountPct: discountPct,
-              variantType: variantType,
+              variants: variants, hasVariantData: hasVariants,
             );
           });
         },
@@ -134,8 +154,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     required List<String> images, required String imageUrl, required String name,
     required String shortDesc, required String description, required double price,
     required double comparePrice, required int stock, required List<String> tags,
-    required bool hasDiscount, required int discountPct, required _VariantType variantType,
-    required double maxWidth,
+    required bool hasDiscount, required int discountPct, required List<dynamic> variants,
+    required bool hasVariantData, required double maxWidth,
   }) {
     return Column(
       children: [
@@ -193,7 +213,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     color: const Color(0xFFF8F8F8),
                                     child: images.isNotEmpty
                                         ? CachedNetworkImage(
-                                            imageUrl: images[_selectedThumbIndex],
+                                            imageUrl: _getVariantImage() ?? images[_selectedThumbIndex],
                                             fit: BoxFit.contain,
                                             placeholder: (_, __) => Shimmer.fromColors(
                                               baseColor: Colors.grey.shade200, highlightColor: Colors.grey.shade50,
@@ -294,12 +314,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           const SizedBox(height: 24),
                           const Divider(color: AppTheme.dividerColor),
                           const SizedBox(height: 20),
-                          // Color selector
-                          if (variantType == _VariantType.clothing || variantType == _VariantType.shoes)
-                            _buildColorSelector(),
-                          // Size selector
-                          if (variantType != _VariantType.none)
-                            _buildSizeSelector(variantType),
+                          // Variant selectors (data-driven)
+                          if (hasVariantData && variants.isNotEmpty)
+                            ...variants.map((v) => _buildVariantSelector(v, images)),
                           // Tags
                           if (tags.isNotEmpty) _buildTags(tags),
                           // Description
@@ -331,7 +348,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     required List<String> images, required String imageUrl, required String name,
     required String shortDesc, required String description, required double price,
     required double comparePrice, required int stock, required List<String> tags,
-    required bool hasDiscount, required int discountPct, required _VariantType variantType,
+    required bool hasDiscount, required int discountPct, required List<dynamic> variants,
+    required bool hasVariantData,
   }) {
     return Stack(
       children: [
@@ -496,10 +514,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 24),
                     const Divider(color: AppTheme.dividerColor),
                     const SizedBox(height: 16),
-                    if (variantType == _VariantType.clothing || variantType == _VariantType.shoes)
-                      _buildColorSelector(),
-                    if (variantType != _VariantType.none)
-                      _buildSizeSelector(variantType),
+                    if (hasVariantData && variants.isNotEmpty)
+                      ...variants.map((v) => _buildVariantSelector(v, images)),
                     if (tags.isNotEmpty) _buildTags(tags),
                     const Divider(color: AppTheme.dividerColor),
                     const SizedBox(height: 16),
@@ -554,66 +570,104 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildColorSelector() {
+  // ── Dynamic variant selector (data-driven) ──
+  Widget _buildVariantSelector(dynamic variant, List<String> productImages) {
+    final typeName = (variant['name'] ?? '').toString();
+    final options = (variant['options'] as List?) ?? [];
+    if (options.isEmpty) return const SizedBox.shrink();
+
+    final selectedOpt = _selectedVariants[typeName];
+    final selectedName = selectedOpt?['name'] ?? '';
+    final isColorType = typeName.toLowerCase().contains('color');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Text('Color', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-            const SizedBox(width: 10),
-            Text((_defaultColors[_selectedColorIndex]['name'] as String?) ?? '',
-              style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+            Text(typeName, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            if (selectedName.isNotEmpty) ...[
+              const SizedBox(width: 10),
+              Text(selectedName, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
+            ],
           ],
         ),
         const SizedBox(height: 12),
-        Row(
-          children: List.generate(_defaultColors.length, (i) {
-            final color = _defaultColors[i]['color'] as Color;
-            final isSelected = i == _selectedColorIndex;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedColorIndex = i),
-              child: Container(
-                width: 40, height: 40,
-                margin: const EdgeInsets.only(right: 12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle, color: color,
-                  border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor, width: isSelected ? 3 : 1),
-                  boxShadow: isSelected ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8)] : null,
-                ),
-                child: isSelected ? Icon(Icons.check_rounded, size: 18, color: color.computeLuminance() > 0.5 ? AppTheme.textPrimary : Colors.white) : null,
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 20),
-      ],
-    );
-  }
-
-  Widget _buildSizeSelector(_VariantType variantType) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(variantType == _VariantType.electronics ? 'Almacenamiento' : 'Talla',
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-        const SizedBox(height: 12),
         Wrap(
           spacing: 10, runSpacing: 10,
-          children: _getSizeOptions(variantType).map((size) {
-            final isSelected = _selectedSize == size;
+          children: options.map<Widget>((opt) {
+            final optName = (opt['name'] ?? '').toString();
+            final priceAdj = (opt['price_adjustment'] as num?)?.toDouble() ?? 0;
+            final optImage = (opt['image'] ?? '').toString();
+            final isSelected = selectedName == optName;
+
+            // If it's a color type with image, show as image swatch
+            if (isColorType && optImage.isNotEmpty) {
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _selectedVariants[typeName] = Map<String, dynamic>.from(opt as Map);
+                }),
+                child: Tooltip(
+                  message: optName,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 48, height: 48,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor,
+                        width: isSelected ? 3 : 1,
+                      ),
+                      boxShadow: isSelected ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), blurRadius: 8)] : null,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: CachedNetworkImage(
+                        imageUrl: optImage,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: Colors.grey.shade200,
+                          child: Center(child: Text(optName[0], style: const TextStyle(fontWeight: FontWeight.w600))),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            // Default: pill-style button
             return GestureDetector(
-              onTap: () => setState(() => _selectedSize = size),
+              onTap: () => setState(() {
+                _selectedVariants[typeName] = Map<String, dynamic>.from(opt as Map);
+              }),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: EdgeInsets.symmetric(horizontal: variantType == _VariantType.electronics ? 18 : 16, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: optName.length > 4 ? 18 : 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: isSelected ? Theme.of(context).colorScheme.primary : Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor, width: isSelected ? 2 : 1),
+                  border: Border.all(
+                    color: isSelected ? Theme.of(context).colorScheme.primary : AppTheme.dividerColor,
+                    width: isSelected ? 2 : 1,
+                  ),
                   boxShadow: isSelected ? [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2), blurRadius: 8)] : null,
                 ),
-                child: Text(size, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: isSelected ? Colors.white : AppTheme.textPrimary)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(optName, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : AppTheme.textPrimary)),
+                    if (priceAdj != 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        priceAdj > 0 ? '+${_currency.format(priceAdj)}' : _currency.format(priceAdj),
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600,
+                          color: isSelected ? Colors.white70 : AppTheme.textSecondary),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             );
           }).toList(),
@@ -642,6 +696,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Widget _buildAddToCartBar(String name, double price, int stock, String imageUrl, {required bool compact}) {
+    // Build variant selection label for snackbar
+    final variantLabel = _selectedVariants.entries
+        .map((e) => '${e.key}: ${e.value['name']}')
+        .join(' | ');
+    final variantMap = _selectedVariants.map((key, val) => MapEntry(key, (val['name'] ?? '').toString()));
+
     return Container(
       padding: compact
           ? EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16)
@@ -692,15 +752,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     productId: widget.productId,
                     productName: name,
                     productPrice: price,
-                    productImage: imageUrl,
+                    productImage: _getVariantImage() ?? imageUrl,
                     quantity: _quantity,
+                    selectedVariants: variantMap.isNotEmpty ? variantMap : null,
                   ));
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Row(children: [
                         const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
                         const SizedBox(width: 8),
-                        Expanded(child: Text('$name agregado al carrito')),
+                        Expanded(child: Text(variantLabel.isNotEmpty
+                            ? '$name ($variantLabel) agregado al carrito'
+                            : '$name agregado al carrito')),
                       ]),
                       backgroundColor: AppTheme.successColor,
                       behavior: SnackBarBehavior.floating,
@@ -788,15 +851,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     Share.share(text, subject: name);
   }
 
-  List<String> _getSizeOptions(_VariantType type) {
-    switch (type) {
-      case _VariantType.clothing: return _clothingSizes;
-      case _VariantType.shoes: return _shoeSizes;
-      case _VariantType.electronics: return _electronicsStorage;
-      case _VariantType.none: return [];
-    }
-  }
-
   Widget _buildLoading() {
     return CustomScrollView(
       slivers: [
@@ -869,5 +923,3 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 }
-
-enum _VariantType { clothing, shoes, electronics, none }

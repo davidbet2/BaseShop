@@ -51,6 +51,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         event.productPrice,
         event.productImage,
         event.quantity,
+        selectedVariants: event.selectedVariants,
       );
       add(const LoadCart());
     } catch (e) {

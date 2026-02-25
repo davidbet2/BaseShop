@@ -29,13 +29,84 @@ function handleValidation(req, res) {
 
 function parseProduct(product) {
   if (!product) return null;
-  return {
+  const discountPct = product.discount_percent || 0;
+  const originalPrice = product.price;
+  const finalPrice = discountPct > 0
+    ? Math.round(originalPrice * (1 - discountPct / 100) * 100) / 100
+    : originalPrice;
+
+  const parsed = {
     ...product,
     images: (() => { try { return JSON.parse(product.images || '[]'); } catch { return []; } })(),
     tags: product.tags ? product.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
     is_active: !!product.is_active,
     is_featured: !!product.is_featured,
+    has_variants: !!product.has_variants,
+    discount_percent: discountPct,
+    // For backward compatibility: price = final selling price, compare_price = original
+    price: finalPrice,
+    compare_price: discountPct > 0 ? originalPrice : 0,
+    original_price: originalPrice,
+    final_price: finalPrice,
   };
+  return parsed;
+}
+
+// Load variants for a product
+function loadProductVariants(db, productId) {
+  const types = db.prepare(
+    'SELECT * FROM product_variant_types WHERE product_id = ? ORDER BY sort_order ASC'
+  ).all(productId);
+
+  return types.map(type => {
+    const options = db.prepare(
+      'SELECT * FROM product_variant_options WHERE variant_type_id = ? AND is_active = 1 ORDER BY sort_order ASC'
+    ).all(type.id);
+    return {
+      id: type.id,
+      name: type.name,
+      sort_order: type.sort_order,
+      options: options.map(opt => ({
+        id: opt.id,
+        name: opt.name,
+        price_adjustment: opt.price_adjustment || 0,
+        image: opt.image || '',
+        sort_order: opt.sort_order,
+      })),
+    };
+  });
+}
+
+// Save variants for a product (creates/replaces all)
+function saveProductVariants(db, productId, variants) {
+  // Delete existing variants
+  db.prepare('DELETE FROM product_variant_options WHERE product_id = ?').run(productId);
+  db.prepare('DELETE FROM product_variant_types WHERE product_id = ?').run(productId);
+
+  if (!variants || !Array.isArray(variants) || variants.length === 0) {
+    db.prepare('UPDATE products SET has_variants = 0, updated_at = datetime("now") WHERE id = ?').run(productId);
+    return;
+  }
+
+  db.prepare('UPDATE products SET has_variants = 1, updated_at = datetime("now") WHERE id = ?').run(productId);
+
+  for (let i = 0; i < variants.length; i++) {
+    const variant = variants[i];
+    const typeId = uuidv4();
+    db.prepare(
+      'INSERT INTO product_variant_types (id, product_id, name, sort_order) VALUES (?, ?, ?, ?)'
+    ).run(typeId, productId, variant.name, i);
+
+    if (variant.options && Array.isArray(variant.options)) {
+      for (let j = 0; j < variant.options.length; j++) {
+        const opt = variant.options[j];
+        db.prepare(
+          `INSERT INTO product_variant_options (id, variant_type_id, product_id, name, price_adjustment, image, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).run(uuidv4(), typeId, productId, opt.name, parseFloat(opt.price_adjustment || 0), opt.image || '', j);
+      }
+    }
+  }
 }
 
 // Obtiene todos los IDs de subcategorías de una categoría (recursivo)
@@ -143,7 +214,15 @@ productsRouter.get('/', (req, res) => {
        LIMIT ? OFFSET ?`
     ).all(...params, limitNum, offset);
 
-    const products = rows.map(parseProduct);
+    const products = rows.map(row => {
+      const parsed = parseProduct(row);
+      if (parsed.has_variants) {
+        parsed.variants = loadProductVariants(db, parsed.id);
+      } else {
+        parsed.variants = [];
+      }
+      return parsed;
+    });
 
     res.json({
       products,
@@ -177,7 +256,15 @@ productsRouter.get('/:id', (req, res) => {
       return res.status(404).json({ error: 'Producto no encontrado' });
     }
 
-    res.json({ product: parseProduct(product) });
+    const parsed = parseProduct(product);
+    // Load variants if product has them
+    if (parsed.has_variants) {
+      parsed.variants = loadProductVariants(db, req.params.id);
+    } else {
+      parsed.variants = [];
+    }
+
+    res.json({ product: parsed });
   } catch (error) {
     console.error('[products] Detail error:', error);
     res.status(500).json({ error: 'Error al obtener producto' });
@@ -208,8 +295,8 @@ productsRouter.post('/',
       const db = getDb();
       const {
         name, description, short_description, price, compare_price,
-        sku, stock, category_id, images, is_active, is_featured,
-        weight, dimensions, tags,
+        discount_percent, sku, stock, category_id, images, is_active,
+        is_featured, weight, dimensions, tags, variants,
       } = req.body;
 
       // Verificar categoría si se envía
@@ -232,18 +319,26 @@ productsRouter.post('/',
       const slug = slugify(name) + '-' + id.substring(0, 8);
       const imagesJson = JSON.stringify(images || []);
       const tagsStr = Array.isArray(tags) ? tags.join(',') : (tags || '');
+      const hasVariants = variants && Array.isArray(variants) && variants.length > 0 ? 1 : 0;
+      const discountPct = parseFloat(discount_percent || 0);
 
-      db.prepare(`INSERT INTO products (id, name, slug, description, short_description, price, compare_price, sku, stock, category_id, images, is_active, is_featured, weight, dimensions, tags)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      db.prepare(`INSERT INTO products (id, name, slug, description, short_description, price, compare_price, discount_percent, has_variants, sku, stock, category_id, images, is_active, is_featured, weight, dimensions, tags)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         id, name, slug,
         description || '', short_description || '',
         parseFloat(price), parseFloat(compare_price || 0),
+        discountPct, hasVariants,
         sku || null, parseInt(stock || 0),
         category_id || null, imagesJson,
         is_active !== undefined ? (is_active ? 1 : 0) : 1,
         is_featured ? 1 : 0,
         parseFloat(weight || 0), dimensions || '', tagsStr
       );
+
+      // Save variants if provided
+      if (hasVariants) {
+        saveProductVariants(db, id, variants);
+      }
 
       const product = db.prepare(
         `SELECT p.*, c.name as category_name, c.slug as category_slug
@@ -252,7 +347,10 @@ productsRouter.post('/',
          WHERE p.id = ?`
       ).get(id);
 
-      res.status(201).json({ product: parseProduct(product), message: 'Producto creado exitosamente' });
+      const parsed = parseProduct(product);
+      parsed.variants = hasVariants ? loadProductVariants(db, id) : [];
+
+      res.status(201).json({ product: parsed, message: 'Producto creado exitosamente' });
     } catch (error) {
       console.error('[products] Create error:', error);
       res.status(500).json({ error: 'Error al crear producto' });
@@ -284,8 +382,8 @@ productsRouter.put('/:id',
 
       const {
         name, description, short_description, price, compare_price,
-        sku, stock, category_id, images, is_active, is_featured,
-        weight, dimensions, tags,
+        discount_percent, sku, stock, category_id, images, is_active,
+        is_featured, weight, dimensions, tags, variants,
       } = req.body;
 
       // Verificar categoría si se envía
@@ -311,9 +409,14 @@ productsRouter.put('/:id',
         ? (Array.isArray(tags) ? tags.join(',') : tags)
         : existing.tags;
 
+      const hasVariants = variants !== undefined
+        ? (variants && Array.isArray(variants) && variants.length > 0 ? 1 : 0)
+        : existing.has_variants;
+
       db.prepare(`UPDATE products SET
         name = ?, slug = ?, description = ?, short_description = ?,
-        price = ?, compare_price = ?, sku = ?, stock = ?,
+        price = ?, compare_price = ?, discount_percent = ?, has_variants = ?,
+        sku = ?, stock = ?,
         category_id = ?, images = ?, is_active = ?, is_featured = ?,
         weight = ?, dimensions = ?, tags = ?, updated_at = datetime('now')
         WHERE id = ?`).run(
@@ -322,6 +425,8 @@ productsRouter.put('/:id',
         short_description !== undefined ? short_description : existing.short_description,
         price !== undefined ? parseFloat(price) : existing.price,
         compare_price !== undefined ? parseFloat(compare_price) : existing.compare_price,
+        discount_percent !== undefined ? parseFloat(discount_percent) : (existing.discount_percent || 0),
+        hasVariants,
         sku !== undefined ? (sku || null) : existing.sku,
         stock !== undefined ? parseInt(stock) : existing.stock,
         category_id !== undefined ? (category_id || null) : existing.category_id,
@@ -334,6 +439,11 @@ productsRouter.put('/:id',
         req.params.id
       );
 
+      // Update variants if provided
+      if (variants !== undefined) {
+        saveProductVariants(db, req.params.id, variants);
+      }
+
       const product = db.prepare(
         `SELECT p.*, c.name as category_name, c.slug as category_slug
          FROM products p
@@ -341,7 +451,10 @@ productsRouter.put('/:id',
          WHERE p.id = ?`
       ).get(req.params.id);
 
-      res.json({ product: parseProduct(product), message: 'Producto actualizado exitosamente' });
+      const parsed = parseProduct(product);
+      parsed.variants = loadProductVariants(db, req.params.id);
+
+      res.json({ product: parsed, message: 'Producto actualizado exitosamente' });
     } catch (error) {
       console.error('[products] Update error:', error);
       res.status(500).json({ error: 'Error al actualizar producto' });
@@ -364,6 +477,9 @@ productsRouter.delete('/:id',
       }
 
       db.prepare('UPDATE products SET is_active = 0, updated_at = datetime("now") WHERE id = ?').run(req.params.id);
+
+      // Also deactivate variant options
+      db.prepare('UPDATE product_variant_options SET is_active = 0 WHERE product_id = ?').run(req.params.id);
 
       res.json({ message: 'Producto eliminado exitosamente' });
     } catch (error) {

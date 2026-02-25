@@ -714,9 +714,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     final shortDescCtrl = TextEditingController(
         text: product?['short_description'] as String? ?? '');
     final priceCtrl = TextEditingController(
-        text: (product?['price'] as num?)?.toString() ?? '');
-    final comparePriceCtrl = TextEditingController(
-        text: (product?['compare_price'] as num?)?.toString() ?? '');
+        text: (product?['original_price'] as num?)?.toString() ??
+            (product?['price'] as num?)?.toString() ?? '');
+    final discountCtrl = TextEditingController(
+        text: (product?['discount_percent'] as num?)?.toStringAsFixed(0) ?? '');
     final skuCtrl =
         TextEditingController(text: product?['sku'] as String? ?? '');
     final stockCtrl = TextEditingController(
@@ -752,6 +753,29 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
         product?['is_featured'] == true || product?['is_featured'] == 1;
     String? selectedCategory = product?['category_id']?.toString();
 
+    // ── Variants state ──
+    bool hasVariants = product?['has_variants'] == true || product?['has_variants'] == 1;
+    // variants: List of { 'name': String, 'options': List<{ 'name': String, 'price_adjustment': double, 'image': String }> }
+    final List<Map<String, dynamic>> variants = [];
+    if (product != null && product['variants'] is List) {
+      for (final v in product['variants'] as List) {
+        final options = <Map<String, dynamic>>[];
+        if (v['options'] is List) {
+          for (final opt in v['options'] as List) {
+            options.add({
+              'name': opt['name'] ?? '',
+              'price_adjustment': (opt['price_adjustment'] as num?)?.toDouble() ?? 0.0,
+              'image': opt['image'] ?? '',
+            });
+          }
+        }
+        variants.add({
+          'name': v['name'] ?? '',
+          'options': options,
+        });
+      }
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -761,6 +785,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, ss) {
+            // Compute final price preview
+            final basePrice = double.tryParse(priceCtrl.text) ?? 0;
+            final discount = double.tryParse(discountCtrl.text) ?? 0;
+            final finalPrice = discount > 0
+                ? (basePrice * (1 - discount / 100))
+                : basePrice;
+
             return DraggableScrollableSheet(
               expand: false,
               initialChildSize: 0.92,
@@ -803,19 +834,43 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                       _field(
                           shortDescCtrl, 'Descripción corta', Icons.short_text),
                       const SizedBox(height: 12),
+                      // ── Price + Discount ──
                       Row(children: [
                         Expanded(
+                          flex: 2,
                           child: _field(priceCtrl, 'Precio',
                               Icons.attach_money,
                               keyboardType: TextInputType.number),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: _field(comparePriceCtrl,
-                              'Precio comparar', Icons.money_off,
+                          child: _field(discountCtrl,
+                              'Desc. %', Icons.percent,
                               keyboardType: TextInputType.number),
                         ),
                       ]),
+                      if (discount > 0 && basePrice > 0) ...[
+                        const SizedBox(height: 6),
+                        Row(children: [
+                          Text(
+                            'Precio original: ${_currencyFmt.format(basePrice)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.shade600,
+                              decoration: TextDecoration.lineThrough,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Precio final: ${_currencyFmt.format(finalPrice)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        ]),
+                      ],
                       const SizedBox(height: 12),
                       _field(skuCtrl, 'SKU', Icons.qr_code),
                       const SizedBox(height: 12),
@@ -948,6 +1003,33 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                         activeColor: Theme.of(context).colorScheme.primary,
                         onChanged: (v) => ss(() => isFeatured = v),
                       ),
+                      const SizedBox(height: 8),
+
+                      // ══════════════════════════════════════════
+                      // ── VARIANTS SECTION ──────────────────────
+                      // ══════════════════════════════════════════
+                      SwitchListTile(
+                        title: const Text('Este producto tiene variantes'),
+                        subtitle: Text(
+                          'Tallas, colores, memoria, etc.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                        secondary: Icon(
+                          Icons.tune,
+                          color: hasVariants
+                              ? Theme.of(context).colorScheme.primary
+                              : Colors.grey.shade400,
+                        ),
+                        value: hasVariants,
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        onChanged: (v) => ss(() => hasVariants = v),
+                      ),
+
+                      if (hasVariants) ...[
+                        const SizedBox(height: 8),
+                        _buildVariantsBuilder(ss, variants),
+                      ],
+
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
@@ -968,9 +1050,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                   shortDescCtrl.text.trim(),
                               'price':
                                   double.tryParse(priceCtrl.text) ?? 0,
-                              'compare_price': double.tryParse(
-                                      comparePriceCtrl.text) ??
-                                  0,
+                              'discount_percent':
+                                  double.tryParse(discountCtrl.text) ?? 0,
                               'sku': skuCtrl.text.trim().isEmpty
                                   ? null
                                   : skuCtrl.text.trim(),
@@ -984,6 +1065,20 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                   .where((t) => t.isNotEmpty)
                                   .toList(),
                             };
+
+                            // Add variants if enabled
+                            if (hasVariants && variants.isNotEmpty) {
+                              payload['variants'] = variants.map((v) => {
+                                'name': v['name'],
+                                'options': (v['options'] as List).map((o) => {
+                                  'name': o['name'],
+                                  'price_adjustment': o['price_adjustment'] ?? 0,
+                                  'image': o['image'] ?? '',
+                                }).toList(),
+                              }).toList();
+                            } else if (!hasVariants) {
+                              payload['variants'] = [];
+                            }
 
                             if (isEditing) {
                               _bloc.add(UpdateProduct(
@@ -1023,6 +1118,439 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           },
         );
       },
+    );
+  }
+
+  // ── Variants builder widget ──
+  Widget _buildVariantsBuilder(
+    StateSetter ss,
+    List<Map<String, dynamic>> variants,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Existing variant types
+        ...variants.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final variant = entry.value;
+          final typeName = variant['name'] as String? ?? '';
+          final options = variant['options'] as List<Map<String, dynamic>>? ?? [];
+
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Theme.of(context).colorScheme.primary.withOpacity(0.3)),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Variant type header
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          typeName.isEmpty ? 'Tipo de variante' : typeName,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        onPressed: () => _editVariantTypeName(ss, variants, idx),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.delete_outline,
+                            size: 18, color: AppTheme.errorColor),
+                        onPressed: () => ss(() => variants.removeAt(idx)),
+                      ),
+                    ],
+                  ),
+
+                  // Options list
+                  ...options.asMap().entries.map((optEntry) {
+                    final optIdx = optEntry.key;
+                    final opt = optEntry.value;
+                    return Container(
+                      margin: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          // Option image thumbnail if exists
+                          if ((opt['image'] as String? ?? '').isNotEmpty) ...[
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.network(
+                                opt['image']!,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) =>
+                                    _imgPlaceholder(32),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  opt['name'] as String? ?? '',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w500, fontSize: 13),
+                                ),
+                                if ((opt['price_adjustment'] as num?) != null &&
+                                    (opt['price_adjustment'] as num) != 0)
+                                  Text(
+                                    (opt['price_adjustment'] as num) > 0
+                                        ? '+${_currencyFmt.format(opt['price_adjustment'])}'
+                                        : _currencyFmt.format(opt['price_adjustment']),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: (opt['price_adjustment'] as num) > 0
+                                          ? AppTheme.successColor
+                                          : AppTheme.errorColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 16),
+                            onPressed: () =>
+                                _editVariantOption(ss, variants, idx, optIdx),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close,
+                                size: 16, color: AppTheme.errorColor),
+                            onPressed: () => ss(() => options.removeAt(optIdx)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+
+                  // Add option button
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          _addVariantOption(ss, variants, idx),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Agregar opción',
+                          style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+
+        // Add variant type button
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: () => _addVariantType(ss, variants),
+            icon: const Icon(Icons.add),
+            label: const Text('Agregar tipo de variante'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.primary,
+              side: BorderSide(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.5)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+
+        // Quick-add templates
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            _variantTemplate(ss, variants, 'Talla', ['XS', 'S', 'M', 'L', 'XL']),
+            _variantTemplate(ss, variants, 'Color', ['Negro', 'Blanco', 'Azul', 'Rojo']),
+            _variantTemplate(ss, variants, 'Talla Calzado', ['36', '37', '38', '39', '40', '41', '42']),
+            _variantTemplate(ss, variants, 'Memoria', ['64GB', '128GB', '256GB', '512GB']),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _variantTemplate(
+    StateSetter ss,
+    List<Map<String, dynamic>> variants,
+    String label,
+    List<String> options,
+  ) {
+    return ActionChip(
+      avatar: const Icon(Icons.auto_awesome, size: 14),
+      label: Text(label, style: const TextStyle(fontSize: 11)),
+      onPressed: () {
+        // Don't add if type already exists
+        final exists = variants.any(
+            (v) => (v['name'] as String).toLowerCase() == label.toLowerCase());
+        if (exists) return;
+        ss(() {
+          variants.add({
+            'name': label,
+            'options': options
+                .map((o) => {
+                      'name': o,
+                      'price_adjustment': 0.0,
+                      'image': '',
+                    })
+                .toList(),
+          });
+        });
+      },
+    );
+  }
+
+  void _addVariantType(
+    StateSetter ss,
+    List<Map<String, dynamic>> variants,
+  ) {
+    final nameCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nuevo tipo de variante'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Nombre (ej: Color, Talla, Memoria)',
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              ss(() {
+                variants.add({
+                  'name': nameCtrl.text.trim(),
+                  'options': <Map<String, dynamic>>[],
+                });
+              });
+            },
+            child: const Text('Crear'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editVariantTypeName(
+    StateSetter ss,
+    List<Map<String, dynamic>> variants,
+    int idx,
+  ) {
+    final nameCtrl = TextEditingController(text: variants[idx]['name'] as String);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar tipo de variante'),
+        content: TextField(
+          controller: nameCtrl,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'Nombre',
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              ss(() => variants[idx]['name'] = nameCtrl.text.trim());
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _addVariantOption(
+    StateSetter ss,
+    List<Map<String, dynamic>> variants,
+    int typeIdx,
+  ) {
+    final nameCtrl = TextEditingController();
+    final priceCtrl = TextEditingController(text: '0');
+    final imageCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Nueva opción de ${variants[typeIdx]['name']}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'Nombre (ej: Rojo, XL, 256GB)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Ajuste de precio (+/-)',
+                  helperText: 'Ej: 50000 agrega al precio base, -10000 resta',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: imageCtrl,
+                decoration: InputDecoration(
+                  labelText: 'URL imagen (opcional)',
+                  helperText: 'Para que la imagen cambie al seleccionar',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.trim().isEmpty) return;
+              Navigator.pop(ctx);
+              ss(() {
+                final options =
+                    variants[typeIdx]['options'] as List<Map<String, dynamic>>;
+                options.add({
+                  'name': nameCtrl.text.trim(),
+                  'price_adjustment':
+                      double.tryParse(priceCtrl.text) ?? 0.0,
+                  'image': imageCtrl.text.trim(),
+                });
+              });
+            },
+            child: const Text('Agregar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _editVariantOption(
+    StateSetter ss,
+    List<Map<String, dynamic>> variants,
+    int typeIdx,
+    int optIdx,
+  ) {
+    final opt =
+        (variants[typeIdx]['options'] as List<Map<String, dynamic>>)[optIdx];
+    final nameCtrl = TextEditingController(text: opt['name'] as String);
+    final priceCtrl = TextEditingController(
+        text: (opt['price_adjustment'] as num?)?.toString() ?? '0');
+    final imageCtrl = TextEditingController(text: opt['image'] as String? ?? '');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Editar opción'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Nombre',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: priceCtrl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Ajuste de precio (+/-)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: imageCtrl,
+                decoration: InputDecoration(
+                  labelText: 'URL imagen (opcional)',
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ss(() {
+                final options =
+                    variants[typeIdx]['options'] as List<Map<String, dynamic>>;
+                options[optIdx] = {
+                  'name': nameCtrl.text.trim(),
+                  'price_adjustment':
+                      double.tryParse(priceCtrl.text) ?? 0.0,
+                  'image': imageCtrl.text.trim(),
+                };
+              });
+            },
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
     );
   }
 

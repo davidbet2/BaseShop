@@ -17,6 +17,7 @@ class AddToCart extends CartEvent {
   final double productPrice;
   final String productImage;
   final int quantity;
+  final Map<String, String>? selectedVariants;
 
   const AddToCart({
     required this.productId,
@@ -24,11 +25,12 @@ class AddToCart extends CartEvent {
     required this.productPrice,
     required this.productImage,
     this.quantity = 1,
+    this.selectedVariants,
   });
 
   @override
   List<Object?> get props =>
-      [productId, productName, productPrice, productImage, quantity];
+      [productId, productName, productPrice, productImage, quantity, selectedVariants];
 }
 
 class UpdateCartItem extends CartEvent {

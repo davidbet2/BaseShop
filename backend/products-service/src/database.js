@@ -100,6 +100,8 @@ const initDatabase = async () => {
     short_description TEXT DEFAULT '',
     price REAL NOT NULL DEFAULT 0,
     compare_price REAL DEFAULT 0,
+    discount_percent REAL DEFAULT 0,
+    has_variants INTEGER DEFAULT 0,
     sku TEXT UNIQUE,
     stock INTEGER DEFAULT 0,
     category_id TEXT,
@@ -114,6 +116,35 @@ const initDatabase = async () => {
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
   )`);
 
+  // ── Migración: agregar columnas si no existen ──
+  try { rawDb.run('ALTER TABLE products ADD COLUMN discount_percent REAL DEFAULT 0'); } catch(e) {}
+  try { rawDb.run('ALTER TABLE products ADD COLUMN has_variants INTEGER DEFAULT 0'); } catch(e) {}
+
+  // ── Tabla de tipos de variante (Color, Talla, Memoria, etc.) ──
+  rawDb.run(`CREATE TABLE IF NOT EXISTS product_variant_types (
+    id TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  )`);
+
+  // ── Tabla de opciones de variante (Rojo, S, 64GB, etc.) ──
+  rawDb.run(`CREATE TABLE IF NOT EXISTS product_variant_options (
+    id TEXT PRIMARY KEY,
+    variant_type_id TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    price_adjustment REAL DEFAULT 0,
+    image TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (variant_type_id) REFERENCES product_variant_types(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+  )`);
+
   // ── Índices ──
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id)');
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_products_active ON products(is_active)');
@@ -122,6 +153,9 @@ const initDatabase = async () => {
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_categories_parent ON categories(parent_id)');
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_categories_slug ON categories(slug)');
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_products_slug ON products(slug)');
+  rawDb.run('CREATE INDEX IF NOT EXISTS idx_variant_types_product ON product_variant_types(product_id)');
+  rawDb.run('CREATE INDEX IF NOT EXISTS idx_variant_options_type ON product_variant_options(variant_type_id)');
+  rawDb.run('CREATE INDEX IF NOT EXISTS idx_variant_options_product ON product_variant_options(product_id)');
 
   save();
 
