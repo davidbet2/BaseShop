@@ -29,6 +29,11 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   final _searchCtrl = TextEditingController();
   bool _searchVisible = false;
 
+  // ── Multi-select state ─────────────────────────────────────
+  bool _selectMode = false;
+  final Set<String> _selectedProductIds = {};
+  final Set<String> _selectedCategoryIds = {};
+
   final _currencyFmt = NumberFormat.currency(
     locale: 'es_CO',
     symbol: '\$',
@@ -57,6 +62,74 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     ));
   }
 
+  // ── Multi-select helpers ───────────────────────────────────
+
+  String _id(Map<String, dynamic> item) =>
+      (item['_id'] ?? item['id'] ?? '').toString();
+
+  void _toggleProductSelection(String id) {
+    setState(() {
+      if (_selectedProductIds.contains(id)) {
+        _selectedProductIds.remove(id);
+      } else {
+        _selectedProductIds.add(id);
+      }
+    });
+  }
+
+  void _toggleCategorySelection(String id) {
+    setState(() {
+      if (_selectedCategoryIds.contains(id)) {
+        _selectedCategoryIds.remove(id);
+      } else {
+        _selectedCategoryIds.add(id);
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    final prodCount = _selectedProductIds.length;
+    final catCount = _selectedCategoryIds.length;
+    if (prodCount == 0 && catCount == 0) return;
+
+    final parts = <String>[];
+    if (prodCount > 0) parts.add('$prodCount producto${prodCount > 1 ? 's' : ''}');
+    if (catCount > 0) parts.add('$catCount categoría${catCount > 1 ? 's' : ''}');
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar seleccionados'),
+        content: Text('¿Eliminar ${parts.join(' y ')}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    for (final id in _selectedProductIds) {
+      _bloc.add(DeleteProduct(productId: id));
+    }
+    for (final id in _selectedCategoryIds) {
+      _bloc.add(DeleteCategory(categoryId: id));
+    }
+
+    setState(() {
+      _selectMode = false;
+      _selectedProductIds.clear();
+      _selectedCategoryIds.clear();
+    });
+  }
+
   // ── Build ──────────────────────────────────────────────────
 
   @override
@@ -65,7 +138,9 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
       value: _bloc,
       child: Scaffold(
         appBar: AppBar(
-          title: _searchVisible
+          title: _selectMode
+              ? Text('${_selectedProductIds.length + _selectedCategoryIds.length} seleccionados')
+              : _searchVisible
               ? TextField(
                   controller: _searchCtrl,
                   autofocus: true,
@@ -79,23 +154,48 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                 )
               : const Text('Gestionar Productos'),
           actions: [
-            IconButton(
-              icon: Icon(_searchVisible ? Icons.close : Icons.search),
-              onPressed: () {
-                setState(() {
-                  _searchVisible = !_searchVisible;
-                  if (!_searchVisible) {
-                    _searchCtrl.clear();
-                    _refresh();
-                  }
-                });
-              },
-            ),
-            IconButton(
-              icon: const Icon(Icons.add),
-              tooltip: 'Agregar producto',
-              onPressed: () => _showProductForm(context),
-            ),
+            // Multi-select toggle
+            if (_selectMode) ...
+              [
+                IconButton(
+                  icon: const Icon(Icons.delete_sweep, color: Colors.white),
+                  tooltip: 'Eliminar seleccionados',
+                  onPressed: _deleteSelected,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Cancelar selección',
+                  onPressed: () => setState(() {
+                    _selectMode = false;
+                    _selectedProductIds.clear();
+                    _selectedCategoryIds.clear();
+                  }),
+                ),
+              ]
+            else ...[
+              IconButton(
+                icon: Icon(_searchVisible ? Icons.close : Icons.search),
+                onPressed: () {
+                  setState(() {
+                    _searchVisible = !_searchVisible;
+                    if (!_searchVisible) {
+                      _searchCtrl.clear();
+                      _refresh();
+                    }
+                  });
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.checklist),
+                tooltip: 'Seleccionar varios',
+                onPressed: () => setState(() => _selectMode = true),
+              ),
+              IconButton(
+                icon: const Icon(Icons.add),
+                tooltip: 'Agregar producto',
+                onPressed: () => _showProductForm(context),
+              ),
+            ],
           ],
           bottom: TabBar(
             controller: _tabCtrl,
@@ -182,15 +282,30 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
             child: DataTable(
               headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
               columnSpacing: 16,
-              columns: const [
-                DataColumn(label: Text('Imagen', style: TextStyle(fontWeight: FontWeight.w600))),
-                DataColumn(label: Text('Nombre', style: TextStyle(fontWeight: FontWeight.w600))),
-                DataColumn(label: Text('Precio', style: TextStyle(fontWeight: FontWeight.w600))),
-                DataColumn(label: Text('Stock', style: TextStyle(fontWeight: FontWeight.w600))),
-                DataColumn(label: Text('Destacado', style: TextStyle(fontWeight: FontWeight.w600))),
-                DataColumn(label: Text('Acciones', style: TextStyle(fontWeight: FontWeight.w600))),
+              columns: [
+                if (_selectMode)
+                  DataColumn(label: Checkbox(
+                    value: state.products.isNotEmpty &&
+                        state.products.every((p) => _selectedProductIds.contains(_id(p))),
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selectedProductIds.addAll(state.products.map(_id));
+                        } else {
+                          _selectedProductIds.clear();
+                        }
+                      });
+                    },
+                  )),
+                const DataColumn(label: Text('Imagen', style: TextStyle(fontWeight: FontWeight.w600))),
+                const DataColumn(label: Text('Nombre', style: TextStyle(fontWeight: FontWeight.w600))),
+                const DataColumn(label: Text('Precio', style: TextStyle(fontWeight: FontWeight.w600))),
+                const DataColumn(label: Text('Stock', style: TextStyle(fontWeight: FontWeight.w600))),
+                const DataColumn(label: Text('Destacado', style: TextStyle(fontWeight: FontWeight.w600))),
+                const DataColumn(label: Text('Acciones', style: TextStyle(fontWeight: FontWeight.w600))),
               ],
               rows: state.products.map((p) {
+                final pid = _id(p);
                 final name = p['name'] as String? ?? '';
                 final price = (p['price'] as num?)?.toDouble() ?? 0;
                 final stock = p['stock'] as int? ?? 0;
@@ -198,7 +313,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                 final img = _extractFirstImage(p);
 
                 return DataRow(
+                  selected: _selectMode && _selectedProductIds.contains(pid),
                   cells: [
+                    if (_selectMode)
+                      DataCell(Checkbox(
+                        value: _selectedProductIds.contains(pid),
+                        onChanged: (_) => _toggleProductSelection(pid),
+                      )),
                     DataCell(
                       ClipRRect(
                         borderRadius: BorderRadius.circular(6),
@@ -282,12 +403,14 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   }
 
   Widget _productCard(Map<String, dynamic> product) {
+    final pid = _id(product);
     final name = product['name'] as String? ?? 'Sin nombre';
     final price = (product['price'] as num?)?.toDouble() ?? 0;
     final stock = product['stock'] as int? ?? 0;
     final isFeatured =
         product['is_featured'] == true || product['is_featured'] == 1;
     final img = _extractFirstImage(product);
+    final isSelected = _selectMode && _selectedProductIds.contains(pid);
 
     return Dismissible(
       key: ValueKey(product['_id'] ?? product['id'] ?? name),
@@ -313,15 +436,31 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: Colors.grey.shade200),
+          side: BorderSide(color: isSelected ? Theme.of(context).colorScheme.primary : Colors.grey.shade200),
         ),
+        color: isSelected ? Theme.of(context).colorScheme.primary.withOpacity(0.05) : null,
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => _showProductForm(context, product: product),
+          onTap: _selectMode
+              ? () => _toggleProductSelection(pid)
+              : () => _showProductForm(context, product: product),
+          onLongPress: !_selectMode
+              ? () {
+                  setState(() => _selectMode = true);
+                  _toggleProductSelection(pid);
+                }
+              : null,
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
+                if (_selectMode) ...[
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: (_) => _toggleProductSelection(pid),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: img.isNotEmpty
@@ -458,9 +597,22 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                 elevation: 0,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade200),
+                  side: BorderSide(
+                    color: _selectMode && _selectedCategoryIds.contains(parentId)
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey.shade200,
+                  ),
                 ),
+                color: _selectMode && _selectedCategoryIds.contains(parentId)
+                    ? Theme.of(context).colorScheme.primary.withOpacity(0.05)
+                    : null,
                 child: ExpansionTile(
+                  leading: _selectMode
+                      ? Checkbox(
+                          value: _selectedCategoryIds.contains(parentId),
+                          onChanged: (_) => _toggleCategorySelection(parentId),
+                        )
+                      : null,
                   title: Text(
                     parent['name'] as String? ?? '',
                     style: const TextStyle(fontWeight: FontWeight.w600),
@@ -494,9 +646,16 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                     ],
                   ),
                   children: subs.map((sub) {
+                    final subId = _id(sub);
                     return ListTile(
                       contentPadding:
                           const EdgeInsets.only(left: 32, right: 16),
+                      leading: _selectMode
+                          ? Checkbox(
+                              value: _selectedCategoryIds.contains(subId),
+                              onChanged: (_) => _toggleCategorySelection(subId),
+                            )
+                          : null,
                       title: Text(sub['name'] as String? ?? ''),
                       subtitle: Text(
                         sub['description'] as String? ?? '',
@@ -1727,16 +1886,17 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
         'image': multipartFile,
       });
 
-      final response = await apiClient.dio.post('/api/products/upload', data: formData);
+      final response = await apiClient.dio.post('/products/upload', data: formData);
 
       if (mounted) ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (response.statusCode == 200 && response.data['url'] != null) {
         String url = response.data['url'].toString();
-        final baseUrl = apiClient.dio.options.baseUrl;
+        // Gateway origin without /api (uploads are served at /uploads, not /api/uploads)
+        final gatewayOrigin = apiClient.dio.options.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
         // If the URL points to the internal products-service, rewrite to gateway
         if (url.contains(':3003')) {
-          url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), baseUrl);
+          url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), gatewayOrigin);
         }
         return url;
       }

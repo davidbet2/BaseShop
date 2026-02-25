@@ -88,7 +88,13 @@ void configureDependencies() {
   );
 
   // Singleton: store config shared across app
+  // cachedConfig is registered externally in main.dart before this runs
   getIt.registerLazySingleton<StoreConfigCubit>(
-    () => StoreConfigCubit(getIt<StoreConfigService>()),
+    () => StoreConfigCubit(
+      getIt<StoreConfigService>(),
+      cachedConfig: getIt.isRegistered<StoreConfig>()
+          ? getIt<StoreConfig>()
+          : null,
+    ),
   );
 }

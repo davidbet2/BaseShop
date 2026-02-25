@@ -5,7 +5,12 @@ import 'package:baseshop/core/services/store_config_service.dart';
 class StoreConfigCubit extends Cubit<StoreConfigState> {
   final StoreConfigService _service;
 
-  StoreConfigCubit(this._service) : super(StoreConfigLoading());
+  /// If [cachedConfig] is provided, the cubit starts with
+  /// [StoreConfigLoaded] immediately — no flash of default colors.
+  StoreConfigCubit(this._service, {StoreConfig? cachedConfig})
+      : super(cachedConfig != null
+            ? StoreConfigLoaded(cachedConfig)
+            : StoreConfigLoading());
 
   Future<void> loadConfig() async {
     // Don't emit loading if already loaded — prevents flash of fallback values

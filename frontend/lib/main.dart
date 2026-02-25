@@ -19,25 +19,38 @@ import 'package:baseshop/features/auth/bloc/auth_event.dart';
 import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/favorites/bloc/favorites_bloc.dart';
 
-/// Cached values loaded from SharedPreferences before runApp.
-/// Used as fallback while the API config loads to prevent color flash.
-Color _cachedPrimaryColor = AppTheme.defaultPrimary;
+/// Top-level cached values for fallback before API loads.
 String _cachedStoreName = 'BaseShop';
 String _cachedStoreLogo = '';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── Read cached config BEFORE anything renders ──────────
+  // ── Read cached config BEFORE DI so the cubit starts pre-loaded ──
+  StoreConfig? cachedConfig;
   try {
     final prefs = await SharedPreferences.getInstance();
     final hex = prefs.getString('cached_primary_color_hex');
-    if (hex != null && hex.isNotEmpty) {
-      _cachedPrimaryColor = Color(int.parse('FF$hex', radix: 16));
-    }
     _cachedStoreName = prefs.getString('cached_store_name') ?? 'BaseShop';
     _cachedStoreLogo = prefs.getString('cached_store_logo') ?? '';
+    if (hex != null && hex.isNotEmpty) {
+      cachedConfig = StoreConfig(
+        showHeader: true,
+        showFooter: true,
+        storeName: _cachedStoreName,
+        storeLogo: _cachedStoreLogo,
+        featuredTitle: 'Colección destacada',
+        featuredDesc: 'Los productos más elegidos',
+        banners: const [],
+        primaryColorHex: hex,
+      );
+    }
   } catch (_) {}
+
+  // ── Register cached config so DI can inject it into the cubit ──
+  if (cachedConfig != null) {
+    getIt.registerSingleton<StoreConfig>(cachedConfig);
+  }
 
   // ── Dependency injection ─────────────────────────────
   configureDependencies();
@@ -88,7 +101,7 @@ class MyApp extends StatelessWidget {
         builder: (context, configState) {
           final primaryColor = configState is StoreConfigLoaded
               ? configState.config.primaryColor
-              : _cachedPrimaryColor;
+              : AppTheme.defaultPrimary;
 
           // Dynamic favicon + tab title on web
           final storeName = configState is StoreConfigLoaded

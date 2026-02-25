@@ -60,24 +60,34 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
   }
 
   Future<void> _loadFromCubit() async {
+    // If cubit already has data (from cache or prior load), populate immediately
+    final currentState = _cubit.state;
+    if (currentState is StoreConfigLoaded) {
+      _applyConfig(currentState.config);
+    }
+    // Still refresh from API in background
     await _cubit.loadConfig();
     final state = _cubit.state;
     if (state is StoreConfigLoaded) {
-      final c = state.config;
-      setState(() {
-        _storeNameCtrl.text = c.storeName;
-        _logoPath = c.storeLogo;
-        _featuredTitleCtrl.text = c.featuredTitle;
-        _featuredDescCtrl.text = c.featuredDesc;
-        _showHeader = c.showHeader;
-        _showFooter = c.showFooter;
-        _banners = List<BannerConfig>.from(c.banners);
-        _primaryColorHex = c.primaryColorHex;
-        _loading = false;
-      });
-    } else {
+      _applyConfig(state.config);
+    } else if (_loading) {
       setState(() => _loading = false);
     }
+  }
+
+  void _applyConfig(StoreConfig c) {
+    if (!mounted) return;
+    setState(() {
+      _storeNameCtrl.text = c.storeName;
+      _logoPath = c.storeLogo;
+      _featuredTitleCtrl.text = c.featuredTitle;
+      _featuredDescCtrl.text = c.featuredDesc;
+      _showHeader = c.showHeader;
+      _showFooter = c.showFooter;
+      _banners = List<BannerConfig>.from(c.banners);
+      _primaryColorHex = c.primaryColorHex;
+      _loading = false;
+    });
   }
 
   Future<void> _save() async {
@@ -113,13 +123,14 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
       }
 
       final formData = dio_pkg.FormData.fromMap({'image': multipartFile});
-      final response = await apiClient.dio.post('/api/products/upload', data: formData);
+      final response = await apiClient.dio.post('/products/upload', data: formData);
 
       if (response.statusCode == 200 && response.data['url'] != null) {
         String url = response.data['url'].toString();
-        final baseUrl = apiClient.dio.options.baseUrl;
+        // Gateway origin without /api (uploads are served at /uploads, not /api/uploads)
+        final gatewayOrigin = apiClient.dio.options.baseUrl.replaceAll(RegExp(r'/api/?$'), '');
         if (url.contains(':3003')) {
-          url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), baseUrl);
+          url = url.replaceFirst(RegExp(r'http://[^:]+:3003'), gatewayOrigin);
         }
         return url;
       }
@@ -605,24 +616,28 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                   children: [
                     // Image source
                     if (pickedImagePath != null)
-                      Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: _buildBannerThumbnail(pickedImagePath!, double.infinity, 120),
-                          ),
-                          Positioned(
-                            top: 4, right: 4,
-                            child: GestureDetector(
-                              onTap: () => ss(() => pickedImagePath = null),
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                      SizedBox(
+                        width: 300,
+                        height: 120,
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: _buildBannerThumbnail(pickedImagePath!, 300, 120),
+                            ),
+                            Positioned(
+                              top: 4, right: 4,
+                              child: GestureDetector(
+                                onTap: () => ss(() => pickedImagePath = null),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       )
                     else
                       Row(children: [
@@ -739,24 +754,28 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                   children: [
                     // Current image preview
                     if (pickedImagePath != null && pickedImagePath!.isNotEmpty)
-                      Stack(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: _buildBannerThumbnail(pickedImagePath!, double.infinity, 120),
-                          ),
-                          Positioned(
-                            top: 4, right: 4,
-                            child: GestureDetector(
-                              onTap: () => ss(() => pickedImagePath = null),
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                                child: const Icon(Icons.close, size: 14, color: Colors.white),
+                      SizedBox(
+                        width: 300,
+                        height: 120,
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: _buildBannerThumbnail(pickedImagePath!, 300, 120),
+                            ),
+                            Positioned(
+                              top: 4, right: 4,
+                              child: GestureDetector(
+                                onTap: () => ss(() => pickedImagePath = null),
+                                child: Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       )
                     else
                       Row(children: [
