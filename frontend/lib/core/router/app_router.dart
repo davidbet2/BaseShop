@@ -101,6 +101,11 @@ late final GoRouter appRouter = GoRouter(
     try {
       if (!getIt.isRegistered<AuthBloc>()) return null;
       final authState = getIt<AuthBloc>().state;
+
+    // While auth is still initializing, don't redirect — preserve the URL
+    // (critical for PayU return: app reloads and auth hasn't restored yet)
+    if (authState is AuthInitial || authState is AuthLoading) return null;
+
     final isAuthenticated = authState is AuthAuthenticated;
     final currentPath = state.matchedLocation;
     final isAuthPage = _authPages.contains(currentPath);
@@ -147,7 +152,10 @@ late final GoRouter appRouter = GoRouter(
 
     // ── Shell (bottom nav / scaffold) ────────────────────────
     ShellRoute(
-      builder: (context, state, child) => ShellScreen(child: child),
+      builder: (context, state, child) => ShellScreen(
+        child: child,
+        currentLocation: state.uri.path,
+      ),
       routes: [
         GoRoute(
           path: '/home',

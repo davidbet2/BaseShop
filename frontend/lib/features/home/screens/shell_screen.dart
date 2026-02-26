@@ -14,7 +14,8 @@ import 'package:baseshop/features/cart/bloc/cart_state.dart';
 
 class ShellScreen extends StatelessWidget {
   final Widget child;
-  const ShellScreen({super.key, required this.child});
+  final String currentLocation;
+  const ShellScreen({super.key, required this.child, this.currentLocation = ''});
 
   static const _guestDestinations = <_NavItem>[
     _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Inicio', path: '/home'),
@@ -56,7 +57,10 @@ class ShellScreen extends StatelessWidget {
 
         // Wide screen → header nav; narrow screen → bottom nav bar
         final isWeb = MediaQuery.of(context).size.width > 800;
-        final location = GoRouterState.of(context).matchedLocation;
+        // Use the location passed from ShellRoute builder (reliable for pushed routes)
+        final location = currentLocation.isNotEmpty
+            ? currentLocation
+            : GoRouterState.of(context).matchedLocation;
         // Home has its own built-in header, so skip the shell header there
         final showWebHeader = isWeb && location != '/home';
 
@@ -134,7 +138,9 @@ class ShellScreen extends StatelessWidget {
   }
 
   int _calculateSelectedIndex(BuildContext context, List<_NavItem> destinations) {
-    final location = GoRouterState.of(context).matchedLocation;
+    final location = currentLocation.isNotEmpty
+        ? currentLocation
+        : GoRouterState.of(context).matchedLocation;
     for (int i = 0; i < destinations.length; i++) {
       if (location.startsWith(destinations[i].path)) return i;
     }
