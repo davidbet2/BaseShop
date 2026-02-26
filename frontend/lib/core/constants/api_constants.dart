@@ -6,8 +6,9 @@ class ApiConstants {
   static const String _devUrl = 'http://localhost:3000/api';
 
   static String get baseUrl {
-    if (kReleaseMode) {
-      assert(_prodUrl.isNotEmpty, 'API_BASE_URL must be set via --dart-define');
+    // In release mode, use prod URL if defined; otherwise fall back to dev URL
+    // so local `flutter build web` works without --dart-define.
+    if (kReleaseMode && _prodUrl.isNotEmpty) {
       return _prodUrl;
     }
     return _devUrl;

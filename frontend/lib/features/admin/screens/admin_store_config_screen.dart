@@ -182,8 +182,6 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                             child: Column(children: [
                               _buildStoreIdentityCard(),
                               const SizedBox(height: 16),
-                              _buildLayoutTogglesCard(),
-                              const SizedBox(height: 16),
                               _buildPrimaryColorCard(),
                             ]),
                           ),
@@ -199,8 +197,6 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                       )
                     : Column(children: [
                         _buildStoreIdentityCard(),
-                        const SizedBox(height: 16),
-                        _buildLayoutTogglesCard(),
                         const SizedBox(height: 16),
                         _buildPrimaryColorCard(),
                         const SizedBox(height: 16),

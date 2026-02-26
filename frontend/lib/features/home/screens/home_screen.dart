@@ -16,6 +16,8 @@ import 'package:baseshop/features/products/bloc/products_event.dart';
 import 'package:baseshop/features/products/bloc/products_state.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
+import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
+import 'package:baseshop/features/cart/bloc/cart_state.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -101,14 +103,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final storeName = config?.storeName ?? 'BaseShop';
     final featuredTitle = config?.featuredTitle ?? 'Colección destacada';
     final featuredDesc = config?.featuredDesc ?? 'Los productos más elegidos por nuestros clientes';
-    final showHeader = config?.showHeader ?? true;
-    final showFooter = config?.showFooter ?? true;
 
     return CustomScrollView(
       slivers: [
-        // 0. HEADER — optional store identity bar
-        if (showHeader)
-          SliverToBoxAdapter(child: _buildHeader(config, isWide, primary)),
+        // 0. HEADER — store identity bar (always visible)
+        SliverToBoxAdapter(child: _buildHeader(config, isWide, primary)),
 
         // 1. HERO — Full-width cinematic banner
         SliverToBoxAdapter(child: _buildHeroSection(featured, isWide, configBanners, primary)),
@@ -119,9 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(child: _buildFeaturedGrid(popular, isWide)),
         ],
 
-        // 3. FOOTER
-        if (showFooter)
-          SliverToBoxAdapter(child: _buildFooter(isWide, storeName, config?.storeLogo, primary)),
+        // 3. FOOTER (always visible)
+        SliverToBoxAdapter(child: _buildFooter(isWide, storeName, config?.storeLogo, primary)),
       ],
     );
   }
@@ -130,12 +128,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHeader(StoreConfig? config, bool isWide, Color primary) {
     final storeName = config?.storeName ?? 'BaseShop';
     final logoPath = config?.storeLogo ?? '';
+    final authState = context.watch<AuthBloc>().state;
+    final isAuthenticated = authState is AuthAuthenticated;
+    final isAdmin = isAuthenticated &&
+        (authState as AuthAuthenticated).user['role']?.toString().toLowerCase() == 'admin';
 
     return Container(
       padding: EdgeInsets.symmetric(vertical: 12, horizontal: isWide ? 48 : 16),
-      color: Colors.white,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
       child: Row(
         children: [
+          // Logo
           if (logoPath.isNotEmpty) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -151,7 +157,83 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(width: 10),
           ],
           Text(storeName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+
+          // Web navigation links (only on wide/web screens)
+          if (isWide) ...[
+            const Spacer(),
+            if (!isAdmin) ...[
+              _headerNavLink('Inicio', Icons.home_outlined, '/home', primary),
+              const SizedBox(width: 6),
+              _headerNavLink('Tienda', Icons.storefront_outlined, '/products', primary),
+            ],
+            if (isAuthenticated && !isAdmin) ...[
+              const SizedBox(width: 6),
+              _headerNavLink('Carrito', Icons.shopping_bag_outlined, '/cart', primary, showCartBadge: true),
+              const SizedBox(width: 6),
+              _headerNavLink('Pedidos', Icons.receipt_outlined, '/orders', primary),
+            ],
+            if (isAdmin) ...[
+              const SizedBox(width: 6),
+              _headerNavLink('Panel', Icons.dashboard_outlined, '/admin/dashboard', primary),
+              const SizedBox(width: 6),
+              _headerNavLink('Productos', Icons.inventory_2_outlined, '/admin/products', primary),
+              const SizedBox(width: 6),
+              _headerNavLink('Pedidos', Icons.receipt_outlined, '/admin/orders', primary),
+              const SizedBox(width: 6),
+              _headerNavLink('Config', Icons.settings_outlined, '/admin/config', primary),
+            ],
+            const SizedBox(width: 6),
+            if (isAuthenticated)
+              _headerNavLink('Perfil', Icons.person_outline_rounded, '/profile', primary)
+            else
+              _headerNavLink('Ingresar', Icons.login_rounded, '/login', primary),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _headerNavLink(String label, IconData icon, String path, Color primary, {bool showCartBadge = false}) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final isActive = location.startsWith(path);
+
+    Widget child = Text(
+      label,
+      style: TextStyle(
+        fontSize: 15,
+        fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+        color: isActive ? primary : AppTheme.textSecondary,
+        letterSpacing: 0.2,
+      ),
+    );
+
+    if (showCartBadge) {
+      child = BlocBuilder<CartBloc, CartState>(
+        builder: (_, cartState) {
+          final count = cartState is CartLoaded ? cartState.items.length : 0;
+          return Badge(
+            isLabelVisible: count > 0,
+            label: Text('$count', style: const TextStyle(fontSize: 10)),
+            backgroundColor: primary,
+            child: child,
+          );
+        },
+      );
+    }
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () => context.go(path),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? primary.withValues(alpha: 0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: child,
+        ),
       ),
     );
   }
@@ -229,15 +311,18 @@ class _HomeScreenState extends State<HomeScreen> {
                         Text(_currency.format(price),
                           style: TextStyle(fontSize: isWide ? 26 : 22, fontWeight: FontWeight.w800, color: primary)),
                         const SizedBox(height: 20),
-                        GestureDetector(
-                          onTap: () => context.push('/products/$id'),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: primary, borderRadius: BorderRadius.circular(30),
-                              boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: () => context.push('/products/$id'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                              decoration: BoxDecoration(
+                                color: primary, borderRadius: BorderRadius.circular(30),
+                                boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.4), blurRadius: 20, offset: const Offset(0, 8))],
+                              ),
+                              child: const Text('Comprar ahora', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                             ),
-                            child: const Text('Comprar ahora', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
                           ),
                         ),
                       ],
@@ -287,12 +372,15 @@ class _HomeScreenState extends State<HomeScreen> {
               Text('Descubre productos increíbles con la mejor calidad y los mejores precios',
                 textAlign: TextAlign.center, style: TextStyle(fontSize: isWide ? 18 : 15, color: Colors.white70, height: 1.5)),
               const SizedBox(height: 28),
-              GestureDetector(
-                onTap: () => context.go('/products'),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                  decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(30)),
-                  child: const Text('Explorar tienda', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  onTap: () => context.go('/products'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(30)),
+                    child: const Text('Explorar tienda', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                  ),
                 ),
               ),
             ],
@@ -387,9 +475,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _footerLink(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(label, style: const TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w500)),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Text(label, style: const TextStyle(fontSize: 14, color: Colors.white70, fontWeight: FontWeight.w500)),
+      ),
     );
   }
 
@@ -480,9 +571,11 @@ class _FeaturedProductCard extends StatelessWidget {
     final images = product['images'] as List? ?? [];
     final img = images.isNotEmpty ? images.first.toString() : '';
 
-    return GestureDetector(
-      onTap: () => context.push('/products/$id'),
-      child: Container(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => context.push('/products/$id'),
+        child: Container(
         decoration: BoxDecoration(
           color: Colors.white, borderRadius: BorderRadius.circular(16),
           border: Border.all(color: const Color(0xFFEEEEEE)),
@@ -521,6 +614,7 @@ class _FeaturedProductCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

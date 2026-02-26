@@ -5,7 +5,7 @@ const fs = require('fs');
 let rawDb;
 let db;
 
-const DB_PATH = path.resolve(process.env.DB_PATH || './data/config.db');
+const DB_PATH = path.resolve(process.env.DB_PATH || './data/config-service.db');
 
 class Statement {
   constructor(rawDb, sql) {
