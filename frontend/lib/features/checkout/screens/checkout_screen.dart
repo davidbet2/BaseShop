@@ -37,8 +37,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   static const _paymentMethods = [
     {'id': 'cash', 'label': 'Efectivo / Contra entrega', 'icon': Icons.money_rounded, 'desc': 'Paga al recibir tu pedido'},
     {'id': 'transfer', 'label': 'Transferencia bancaria', 'icon': Icons.account_balance_rounded, 'desc': 'Transferencia o depósito'},
-    {'id': 'card', 'label': 'Tarjeta de crédito/débito', 'icon': Icons.credit_card_rounded, 'desc': 'Visa, Mastercard, etc.'},
-    {'id': 'nequi', 'label': 'Nequi / Daviplata', 'icon': Icons.phone_android_rounded, 'desc': 'Billetera digital'},
+    {'id': 'card', 'label': 'Tarjeta de crédito/débito', 'icon': Icons.credit_card_rounded, 'desc': 'Pago seguro con PayU · Visa, Mastercard, etc.'},
+    {'id': 'nequi', 'label': 'Nequi / Daviplata', 'icon': Icons.phone_android_rounded, 'desc': 'Pago seguro con PayU · Billetera digital'},
   ];
 
   @override

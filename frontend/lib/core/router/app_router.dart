@@ -248,33 +248,31 @@ late final GoRouter appRouter = GoRouter(
             child: PoliciesScreen(),
           ),
         ),
+        GoRoute(
+          path: '/checkout',
+          builder: (context, state) => const CheckoutScreen(),
+        ),
+        GoRoute(
+          path: '/payu-checkout',
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>? ?? {};
+            return PayuCheckoutScreen(
+              orderId: extra['orderId']?.toString() ?? '',
+              amount: (extra['amount'] as num?)?.toDouble() ?? 0,
+              buyerEmail: extra['buyerEmail']?.toString() ?? '',
+              buyerName: extra['buyerName']?.toString() ?? '',
+              paymentMethod: extra['paymentMethod']?.toString() ?? '',
+            );
+          },
+        ),
+        GoRoute(
+          path: '/payment-result',
+          builder: (context, state) {
+            final orderId = state.uri.queryParameters['orderId'] ?? '';
+            return PaymentResultScreen(orderId: orderId);
+          },
+        ),
       ],
-    ),
-
-    // ── Full-screen routes (outside shell — payment flows) ───
-    GoRoute(
-      path: '/checkout',
-      builder: (context, state) => const CheckoutScreen(),
-    ),
-    GoRoute(
-      path: '/payu-checkout',
-      builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>? ?? {};
-        return PayuCheckoutScreen(
-          orderId: extra['orderId']?.toString() ?? '',
-          amount: (extra['amount'] as num?)?.toDouble() ?? 0,
-          buyerEmail: extra['buyerEmail']?.toString() ?? '',
-          buyerName: extra['buyerName']?.toString() ?? '',
-          paymentMethod: extra['paymentMethod']?.toString() ?? '',
-        );
-      },
-    ),
-    GoRoute(
-      path: '/payment-result',
-      builder: (context, state) {
-        final orderId = state.uri.queryParameters['orderId'] ?? '';
-        return PaymentResultScreen(orderId: orderId);
-      },
     ),
   ],
 );
