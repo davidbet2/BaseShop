@@ -69,6 +69,9 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
       case '6': return 'declined';
       case '5': return 'expired';
       case '7': return 'pending';
+      case '104': return 'error';
+      case '12': return 'abandoned';
+      case '14': return 'pending_validation';
       default: return 'error';
     }
   }
@@ -137,8 +140,15 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
 
   Widget _buildResult(BuildContext context, String status, Map<String, dynamic> payment, {bool isValidating = false}) {
     final isApproved = status == 'approved';
-    final isPending = status == 'pending';
-    final isDeclined = status == 'declined' || status == 'expired' || status == 'error';
+    final isPending = status == 'pending' || status == 'pending_validation';
+    final isDeclined = status == 'declined';
+    final isExpired = status == 'expired';
+    final isAbandoned = status == 'abandoned';
+    final isError = status == 'error';
+    final isNegative = isDeclined || isExpired || isAbandoned || isError;
+
+    // PayU message from backend (lapTransactionState human-readable)
+    final payuMessage = (payment['payu_message'] ?? '').toString();
 
     IconData icon;
     Color color;
@@ -153,14 +163,33 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
     } else if (isPending) {
       icon = Icons.schedule_rounded;
       color = Colors.orange;
-      title = 'Pago pendiente';
-      subtitle = 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.';
-    } else {
+      title = status == 'pending_validation' ? 'Pago en validación' : 'Pago pendiente';
+      subtitle = status == 'pending_validation'
+          ? 'Tu transacción está siendo revisada. Este proceso puede tardar hasta 48 horas.'
+          : 'Tu pago está siendo procesado. Te notificaremos cuando se confirme.';
+    } else if (isDeclined) {
       icon = Icons.cancel_rounded;
       color = AppTheme.errorColor;
-      title = isDeclined ? 'Pago rechazado' : 'Error en el pago';
-      subtitle = isDeclined
-          ? 'Tu pago fue rechazado por la entidad financiera. Puedes intentar con otro método de pago.'
+      title = 'Pago rechazado';
+      subtitle = payuMessage.isNotEmpty
+          ? payuMessage
+          : 'Tu pago fue rechazado por la entidad financiera. Puedes intentar con otro método de pago.';
+    } else if (isExpired) {
+      icon = Icons.timer_off_rounded;
+      color = Colors.orange.shade800;
+      title = 'Transacción expirada';
+      subtitle = 'El tiempo para completar la transacción ha expirado. Puedes intentar nuevamente.';
+    } else if (isAbandoned) {
+      icon = Icons.exit_to_app_rounded;
+      color = Colors.grey.shade600;
+      title = 'Pago no completado';
+      subtitle = 'Saliste del proceso de pago sin completar la transacción. Puedes reintentar desde tus pedidos.';
+    } else {
+      icon = Icons.error_outline_rounded;
+      color = AppTheme.errorColor;
+      title = 'Error en el pago';
+      subtitle = payuMessage.isNotEmpty
+          ? payuMessage
           : 'Ocurrió un error procesando tu pago. Por favor intenta nuevamente.';
     }
 
@@ -230,7 +259,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
               ),
             ),
 
-            if (isPending || isDeclined) ...[
+            if (isPending || isNegative) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -266,8 +295,10 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
     switch (status) {
       case 'approved': return 'Aprobado';
       case 'pending': return 'Pendiente';
+      case 'pending_validation': return 'En validación';
       case 'declined': return 'Rechazado';
       case 'expired': return 'Expirado';
+      case 'abandoned': return 'Abandonado';
       case 'error': return 'Error';
       default: return status;
     }

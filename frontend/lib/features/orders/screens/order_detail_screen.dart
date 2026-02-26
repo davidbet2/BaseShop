@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
@@ -21,6 +24,7 @@ class OrderDetailScreen extends StatefulWidget {
 
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late final OrdersBloc _bloc;
+  Map<String, dynamic>? _currentOrder;
 
   final _currencyFormat = NumberFormat.currency(
     locale: 'es_CO',
@@ -46,7 +50,24 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     return BlocProvider.value(
       value: _bloc,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Detalle del Pedido')),
+        appBar: AppBar(
+          title: const Text('Detalle del Pedido'),
+          actions: [
+            if (_currentOrder != null) ...[
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'Copiar resumen',
+                onPressed: () => _copyOrderSummary(),
+              ),
+              if (!kIsWeb)
+                IconButton(
+                  icon: const Icon(Icons.share),
+                  tooltip: 'Compartir',
+                  onPressed: () => _shareOrderSummary(),
+                ),
+            ],
+          ],
+        ),
         body: BlocBuilder<OrdersBloc, OrdersState>(
           builder: (context, state) {
             if (state is OrdersLoading) {
@@ -54,6 +75,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             }
 
             if (state is OrderDetailLoaded) {
+              // Store for AppBar actions
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (_currentOrder == null) {
+                  setState(() => _currentOrder = state.order);
+                }
+              });
               return _buildOrderDetail(context, state.order);
             }
 
@@ -235,10 +262,132 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             ),
           ],
           const SizedBox(height: 24),
+
+          // ── Share / Copy Buttons ──
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _copyOrderSummary,
+                  icon: const Icon(Icons.copy, size: 18),
+                  label: const Text('Copiar resumen'),
+                ),
+              ),
+              if (!kIsWeb) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _shareOrderSummary,
+                    icon: const Icon(Icons.share, size: 18),
+                    label: const Text('Compartir'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
   }
+
+  // ── Share / Copy helpers ──
+
+  String _buildOrderSummaryText(Map<String, dynamic> order) {
+    final orderNumber =
+        (order['orderNumber'] ?? order['order_number'] ?? '').toString();
+    final status = (order['status'] ?? 'pending').toString();
+    final items = List<Map<String, dynamic>>.from(order['items'] ?? []);
+    final subtotal = (order['subtotal'] ?? 0) as num;
+    final tax = (order['tax'] ?? 0) as num;
+    final shipping =
+        (order['shippingCost'] ?? order['shipping_cost'] ?? 0) as num;
+    final total = (order['total'] ?? 0) as num;
+    final paymentMethod =
+        (order['paymentMethod'] ?? order['payment_method'] ?? '').toString();
+    final shippingAddress =
+        order['shippingAddress'] ?? order['shipping_address'];
+
+    String dateStr = '';
+    final createdAt = order['createdAt'] ?? order['created_at'];
+    if (createdAt != null) {
+      try {
+        final date = DateTime.parse(createdAt.toString());
+        dateStr = DateFormat('dd MMM yyyy, HH:mm', 'es').format(date);
+      } catch (_) {
+        dateStr = createdAt.toString();
+      }
+    }
+
+    final buf = StringBuffer();
+    buf.writeln('═══════════════════════════');
+    buf.writeln('  RESUMEN DE PEDIDO');
+    buf.writeln('═══════════════════════════');
+    buf.writeln('Pedido: #$orderNumber');
+    if (dateStr.isNotEmpty) buf.writeln('Fecha:  $dateStr');
+    buf.writeln('Estado: ${_statusConfig(status).label}');
+    buf.writeln('');
+    buf.writeln('── Productos ──');
+    for (final item in items) {
+      final name =
+          (item['productName'] ?? item['product_name'] ?? item['name'] ?? 'Producto')
+              .toString();
+      final price = (item['price'] ?? item['productPrice'] ?? 0) as num;
+      final quantity = (item['quantity'] ?? 1) as int;
+      buf.writeln('  • $name x$quantity — ${_currencyFormat.format(price * quantity)}');
+    }
+    buf.writeln('');
+    buf.writeln('── Resumen ──');
+    buf.writeln('  Subtotal:   ${_currencyFormat.format(subtotal)}');
+    if (tax > 0) buf.writeln('  Impuestos:  ${_currencyFormat.format(tax)}');
+    buf.writeln('  Envío:      ${_currencyFormat.format(shipping)}');
+    buf.writeln('  ─────────────────');
+    buf.writeln('  TOTAL:      ${_currencyFormat.format(total)}');
+
+    if (paymentMethod.isNotEmpty) {
+      buf.writeln('');
+      buf.writeln('Pago: ${_formatPaymentMethod(paymentMethod)}');
+    }
+
+    if (shippingAddress != null && shippingAddress is Map<String, dynamic>) {
+      final street = shippingAddress['street'] ?? shippingAddress['address'] ?? '';
+      final city = shippingAddress['city'] ?? '';
+      final state = shippingAddress['state'] ?? shippingAddress['department'] ?? '';
+      buf.writeln('');
+      buf.writeln('── Dirección ──');
+      if (street.toString().isNotEmpty) buf.writeln('  $street');
+      if (city.toString().isNotEmpty || state.toString().isNotEmpty) {
+        buf.writeln('  $city${state.toString().isNotEmpty ? ', $state' : ''}');
+      }
+    }
+
+    buf.writeln('═══════════════════════════');
+    return buf.toString();
+  }
+
+  void _copyOrderSummary() {
+    if (_currentOrder == null) return;
+    final text = _buildOrderSummaryText(_currentOrder!);
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Resumen copiado al portapapeles'),
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _shareOrderSummary() {
+    if (_currentOrder == null) return;
+    final text = _buildOrderSummaryText(_currentOrder!);
+    final orderNumber =
+        (_currentOrder!['orderNumber'] ?? _currentOrder!['order_number'] ?? '')
+            .toString();
+    // ignore: deprecated_member_use
+    Share.share(text, subject: 'Pedido #$orderNumber');
+  }
+
+  // ── Build helpers ──
 
   Widget _buildOrderItem(Map<String, dynamic> item) {
     final name =

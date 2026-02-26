@@ -44,22 +44,38 @@ const ORDERS_SERVICE_URL = () => process.env.ORDERS_SERVICE_URL || 'http://local
 async function notifyOrderService(orderId, paymentStatus, paymentId) {
   try {
     // Map payment status to order status
+    // Based on PayU official states:
+    //   approved → confirmed (payment successful)
+    //   declined → cancelled (payment rejected)
+    //   expired → cancelled (transaction timed out)
+    //   error → cancelled (system error)
+    //   abandoned → cancelled (user left checkout)
+    //   pending → no update (still processing)
+    //   pending_validation → no update (under review)
     const orderStatusMap = {
       approved: 'confirmed',
       declined: 'cancelled',
       expired: 'cancelled',
+      error: 'cancelled',
+      abandoned: 'cancelled',
     };
     const newOrderStatus = orderStatusMap[paymentStatus];
-    if (!newOrderStatus) return; // Don't update order for pending/error
+    if (!newOrderStatus) return; // Don't update order for pending states
+
+    const noteMap = {
+      approved: 'Pago aprobado por PayU',
+      declined: 'Pago rechazado por la entidad financiera',
+      expired: 'La transacción expiró sin completarse',
+      error: 'Error en el procesamiento del pago',
+      abandoned: 'El usuario abandonó el proceso de pago',
+    };
 
     const url = `${ORDERS_SERVICE_URL()}/api/orders/${orderId}/payment-status`;
     await axios.patch(url, {
       status: newOrderStatus,
       payment_id: paymentId,
       payment_status: paymentStatus,
-      note: paymentStatus === 'approved'
-        ? 'Pago confirmado por PayU'
-        : `Pago ${paymentStatus === 'declined' ? 'rechazado' : 'expirado'} por PayU`,
+      note: noteMap[paymentStatus] || `Pago ${paymentStatus}`,
     }, {
       headers: { 'X-Internal-Service': 'payments-service' },
       timeout: 5000,
@@ -92,7 +108,15 @@ function validatePayUWebhookSignature(apiKey, merchantId, referenceCode, amount,
   return crypto.createHash('md5').update(signatureString).digest('hex');
 }
 
-// Map PayU state_pol to internal status
+// Map PayU transactionState / state_pol to internal status
+// Based on official PayU documentation:
+//   4 = Transacción aprobada
+//   5 = Transacción expirada
+//   6 = Transacción rechazada
+//   7 = Transacción pendiente
+//  104 = Error
+//  12 = Transacción abandonada (usuario cerró sin pagar)
+//  14 = Transacción pendiente por validar
 function mapPayUStatus(statePol) {
   const statePolNum = parseInt(statePol, 10);
   switch (statePolNum) {
@@ -100,11 +124,52 @@ function mapPayUStatus(statePol) {
     case 6: return 'declined';
     case 5: return 'expired';
     case 7: return 'pending';
+    case 104: return 'error';
+    case 12: return 'abandoned';
+    case 14: return 'pending_validation';
     default: return 'error';
   }
 }
 
-const VALID_STATUSES = ['pending', 'approved', 'declined', 'expired', 'error', 'refunded'];
+// Map PayU lapTransactionState to a human-readable message (Spanish)
+function mapPayUMessage(lapState) {
+  const messages = {
+    'APPROVED': 'Transacción aprobada',
+    'ANTIFRAUD_REJECTED': 'Transacción rechazada por el sistema antifraude',
+    'PAYMENT_NETWORK_REJECTED': 'Transacción rechazada por la red financiera',
+    'ENTITY_DECLINED': 'Transacción rechazada por la entidad bancaria',
+    'INTERNAL_PAYMENT_PROVIDER_ERROR': 'Error interno del proveedor de pago',
+    'INACTIVE_PAYMENT_PROVIDER': 'Proveedor de pago inactivo',
+    'DIGITAL_CERTIFICATE_NOT_FOUND': 'Certificado digital no encontrado',
+    'INSUFFICIENT_FUNDS': 'Fondos insuficientes',
+    'CREDIT_CARD_NOT_AUTHORIZED': 'Tarjeta de crédito no autorizada para transacciones en línea',
+    'INVALID_EXPIRATION_DATE_OR_SECURITY_CODE': 'Fecha de expiración o código de seguridad inválido',
+    'INVALID_CARD': 'Tarjeta inválida',
+    'EXPIRED_CARD': 'Tarjeta expirada',
+    'RESTRICTED_CARD': 'Tarjeta restringida',
+    'CONTACT_THE_ENTITY': 'Contactar la entidad financiera',
+    'REPEAT_TRANSACTION': 'Reintentar transacción',
+    'ENTITY_MESSAGING_ERROR': 'Error de comunicación con la entidad financiera',
+    'BANK_UNREACHABLE': 'Banco no disponible',
+    'EXPIRED_TRANSACTION': 'Transacción expirada',
+    'PENDING_TRANSACTION_REVIEW': 'Transacción pendiente de revisión',
+    'PENDING_TRANSACTION_CONFIRMATION': 'Transacción pendiente de confirmación',
+    'PENDING_TRANSACTION_TRANSMISSION': 'Transacción pendiente, recibo generado',
+    'PAYMENT_NETWORK_BAD_RESPONSE': 'Respuesta incorrecta de la red financiera',
+    'PAYMENT_NETWORK_NO_CONNECTION': 'Sin conexión con la red financiera',
+    'PAYMENT_NETWORK_NO_RESPONSE': 'Sin respuesta de la red financiera',
+    'FIX_NOT_REQUIRED': 'Corrección no requerida',
+    'AUTOMATICALLY_FIXED_AND_SUCCESS_REVERSAL': 'Corrección automática y reverso exitoso',
+    'AUTOMATICALLY_FIXED_AND_UNSUCCESS_REVERSAL': 'Corrección automática y reverso fallido',
+    'AUTOMATIC_FIXED_NOT_SUPPORTED': 'Corrección automática no soportada',
+    'NOT_FIXED_FOR_ERROR_STATE': 'No se fijó por estado de error',
+    'ERROR_FIXING_AND_REVERSING': 'Error al corregir y reversar',
+    'ERROR_FIXING_INCOMPLETE_DATA': 'Error al corregir datos incompletos',
+  };
+  return messages[lapState] || lapState || '';
+}
+
+const VALID_STATUSES = ['pending', 'approved', 'declined', 'expired', 'error', 'refunded', 'abandoned', 'pending_validation'];
 
 // ══════════════════════════════════════════════
 //  WEBHOOK ROUTE (no auth — PayU callback)
@@ -451,7 +516,12 @@ router.post('/validate-response', [
 
     res.json({
       message: 'Estado de pago actualizado',
-      data: { ...updatedPayment, status: newStatus },
+      data: {
+        ...updatedPayment,
+        status: newStatus,
+        payu_message: mapPayUMessage(lapTransactionState),
+        lap_transaction_state: lapTransactionState || '',
+      },
     });
   } catch (error) {
     console.error('[payments-service] Error validating PayU response:', error);
