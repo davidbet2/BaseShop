@@ -19,6 +19,7 @@ class ShellScreen extends StatelessWidget {
   static const _guestDestinations = <_NavItem>[
     _NavItem(icon: Icons.home_outlined, selectedIcon: Icons.home_rounded, label: 'Inicio', path: '/home'),
     _NavItem(icon: Icons.storefront_outlined, selectedIcon: Icons.storefront_rounded, label: 'Tienda', path: '/products'),
+    _NavItem(icon: Icons.policy_outlined, selectedIcon: Icons.policy_rounded, label: 'Políticas', path: '/policies'),
     _NavItem(icon: Icons.login_rounded, selectedIcon: Icons.login_rounded, label: 'Ingresar', path: '/login'),
   ];
 
@@ -27,6 +28,7 @@ class ShellScreen extends StatelessWidget {
     _NavItem(icon: Icons.storefront_outlined, selectedIcon: Icons.storefront_rounded, label: 'Tienda', path: '/products'),
     _NavItem(icon: Icons.shopping_bag_outlined, selectedIcon: Icons.shopping_bag_rounded, label: 'Carrito', path: '/cart'),
     _NavItem(icon: Icons.receipt_outlined, selectedIcon: Icons.receipt_rounded, label: 'Pedidos', path: '/orders'),
+    _NavItem(icon: Icons.policy_outlined, selectedIcon: Icons.policy_rounded, label: 'Políticas', path: '/policies'),
     _NavItem(icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Perfil', path: '/profile'),
   ];
 
@@ -181,21 +183,32 @@ class _WebHeaderBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Logo
-          if (logoPath.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                logoPath, width: 36, height: 36, fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => _defaultLogo(primary),
+          // Logo — click navigates to home (user) or dashboard (admin)
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => context.go(isAdmin ? '/admin/dashboard' : '/home'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (logoPath.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        logoPath, width: 36, height: 36, fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => _defaultLogo(primary),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ] else ...[
+                    _defaultLogo(primary),
+                    const SizedBox(width: 10),
+                  ],
+                  Text(storeName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                ],
               ),
             ),
-            const SizedBox(width: 10),
-          ] else ...[
-            _defaultLogo(primary),
-            const SizedBox(width: 10),
-          ],
-          Text(storeName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+          ),
 
           const Spacer(),
 
@@ -222,6 +235,13 @@ class _WebHeaderBar extends StatelessWidget {
             _navLink(context, 'Pedidos', Icons.receipt_outlined, '/admin/orders', primary, location),
             const SizedBox(width: 6),
             _navLink(context, 'Config', Icons.settings_outlined, '/admin/config', primary, location),
+            const SizedBox(width: 6),
+            _navLink(context, 'Políticas', Icons.policy_outlined, '/admin/policies', primary, location),
+          ],
+
+          if (!isAdmin) ...[
+            const SizedBox(width: 6),
+            _navLink(context, 'Políticas', Icons.policy_outlined, '/policies', primary, location),
           ],
 
           const SizedBox(width: 6),

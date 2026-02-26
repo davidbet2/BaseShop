@@ -141,22 +141,33 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Row(
         children: [
-          // Logo
-          if (logoPath.isNotEmpty) ...[
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: _buildLogoImage(logoPath, 36, primary),
+          // Logo — click navigates to home (user) or dashboard (admin)
+          MouseRegion(
+            cursor: SystemMouseCursors.click,
+            child: GestureDetector(
+              onTap: () => context.go(isAdmin ? '/admin/dashboard' : '/home'),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (logoPath.isNotEmpty) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: _buildLogoImage(logoPath, 36, primary),
+                    ),
+                    const SizedBox(width: 10),
+                  ] else ...[
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(10)),
+                      child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Text(storeName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                ],
+              ),
             ),
-            const SizedBox(width: 10),
-          ] else ...[
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.shopping_bag_rounded, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 10),
-          ],
-          Text(storeName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+          ),
 
           // Web navigation links (only on wide/web screens)
           if (isWide) ...[
@@ -181,7 +192,14 @@ class _HomeScreenState extends State<HomeScreen> {
               _headerNavLink('Pedidos', Icons.receipt_outlined, '/admin/orders', primary),
               const SizedBox(width: 6),
               _headerNavLink('Config', Icons.settings_outlined, '/admin/config', primary),
+              const SizedBox(width: 6),
+              _headerNavLink('Políticas', Icons.policy_outlined, '/admin/policies', primary),
             ],
+            if (!isAdmin) ...[
+              const SizedBox(width: 6),
+              _headerNavLink('Políticas', Icons.policy_outlined, '/policies', primary),
+            ],
+
             const SizedBox(width: 6),
             if (isAuthenticated)
               _headerNavLink('Perfil', Icons.person_outline_rounded, '/profile', primary)
