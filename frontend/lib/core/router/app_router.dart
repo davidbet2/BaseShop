@@ -30,6 +30,8 @@ import 'package:baseshop/features/admin/screens/admin_orders_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_dashboard_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_order_detail_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_store_config_screen.dart';
+import 'package:baseshop/features/admin/screens/admin_policies_screen.dart';
+import 'package:baseshop/features/policies/screens/policies_screen.dart';
 import 'package:baseshop/features/home/screens/shell_screen.dart';
 
 // ── Auth-only paths (require login) ─────────────────────────
@@ -44,6 +46,7 @@ const _authRequiredPaths = <String>{
   '/admin/products',
   '/admin/orders',
   '/admin/config',
+  '/admin/policies',
 };
 
 // ── Auth pages (login/register) ─────────────────────────────
@@ -59,6 +62,7 @@ const _adminPaths = <String>{
   '/admin/products',
   '/admin/orders',
   '/admin/config',
+  '/admin/policies',
 };
 
 /// Listenable that notifies GoRouter when auth state changes.
@@ -202,6 +206,12 @@ late final GoRouter appRouter = GoRouter(
             child: AdminStoreConfigScreen(),
           ),
         ),
+        GoRoute(
+          path: '/admin/policies',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminPoliciesScreen(),
+          ),
+        ),
       ],
     ),
 
@@ -257,6 +267,10 @@ late final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/addresses',
       builder: (context, state) => const AddressesScreen(),
+    ),
+    GoRoute(
+      path: '/policies',
+      builder: (context, state) => const PoliciesScreen(),
     ),
   ],
 );

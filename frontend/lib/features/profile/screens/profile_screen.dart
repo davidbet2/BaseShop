@@ -112,16 +112,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
 
                   // Admin section
-                  if (role == 'admin') ...[
-                    _buildSection('Administraci\u00f3n', [
+                  if (role == 'admin') ...[                    _buildSection('Administración', [
                       _buildMenuItem(Icons.dashboard_rounded, 'Panel de control', () => context.go('/admin/dashboard')),
                       _buildMenuItem(Icons.inventory_2_outlined, 'Gestionar productos', () => context.go('/admin/products')),
+                      _buildMenuItem(Icons.policy_outlined, 'Gestionar políticas', () => context.go('/admin/policies')),
                     ]),
                     const SizedBox(height: 14),
                   ],
 
                   // General section
                   _buildSection('General', [
+                    _buildMenuItem(Icons.policy_outlined, 'Políticas de la tienda', () => context.push('/policies')),
                     _buildMenuItem(Icons.help_outline_rounded, 'Ayuda y soporte', () {}),
                     _buildMenuItem(Icons.info_outline_rounded, 'Acerca de', () => _showAboutDialog()),
                   ]),

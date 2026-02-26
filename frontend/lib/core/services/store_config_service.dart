@@ -26,6 +26,7 @@ class StoreConfigService {
         featuredDesc: 'Los productos más elegidos por nuestros clientes',
         banners: [],
         primaryColorHex: 'F97316',
+        policiesContent: '',
       );
     }
   }
@@ -39,6 +40,7 @@ class StoreConfigService {
     String? featuredTitle,
     String? featuredDesc,
     String? primaryColorHex,
+    String? policiesContent,
     List<BannerConfig>? banners,
   }) async {
     final body = <String, dynamic>{};
@@ -49,6 +51,7 @@ class StoreConfigService {
     if (featuredTitle != null) body['featured_title'] = featuredTitle;
     if (featuredDesc != null) body['featured_desc'] = featuredDesc;
     if (primaryColorHex != null) body['primary_color_hex'] = primaryColorHex;
+    if (policiesContent != null) body['policies_content'] = policiesContent;
     if (banners != null) {
       body['banners'] = banners.map((b) => b.toJson()).toList();
     }
@@ -68,6 +71,7 @@ class StoreConfig {
   final String featuredDesc;
   final List<BannerConfig> banners;
   final String primaryColorHex;
+  final String policiesContent;
 
   const StoreConfig({
     required this.showHeader,
@@ -78,6 +82,7 @@ class StoreConfig {
     required this.featuredDesc,
     required this.banners,
     this.primaryColorHex = 'F97316',
+    this.policiesContent = '',
   });
 
   factory StoreConfig.fromJson(Map<String, dynamic> json) {
@@ -89,8 +94,7 @@ class StoreConfig {
       storeLogo: json['store_logo']?.toString() ?? '',
       featuredTitle: json['featured_title']?.toString() ?? 'Colección destacada',
       featuredDesc: json['featured_desc']?.toString() ?? 'Los productos más elegidos por nuestros clientes',
-      primaryColorHex: json['primary_color_hex']?.toString() ?? 'F97316',
-      banners: bannersRaw.map((b) => BannerConfig.fromJson(b as Map<String, dynamic>)).toList(),
+      primaryColorHex: json['primary_color_hex']?.toString() ?? 'F97316',      policiesContent: json['policies_content']?.toString() ?? '',      banners: bannersRaw.map((b) => BannerConfig.fromJson(b as Map<String, dynamic>)).toList(),
     );
   }
 

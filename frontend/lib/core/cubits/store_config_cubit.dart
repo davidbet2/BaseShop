@@ -48,6 +48,7 @@ class StoreConfigCubit extends Cubit<StoreConfigState> {
     String? featuredTitle,
     String? featuredDesc,
     String? primaryColorHex,
+    String? policiesContent,
     List<BannerConfig>? banners,
   }) async {
     final currentState = state;
@@ -62,6 +63,7 @@ class StoreConfigCubit extends Cubit<StoreConfigState> {
         featuredTitle: featuredTitle,
         featuredDesc: featuredDesc,
         primaryColorHex: primaryColorHex,
+        policiesContent: policiesContent,
         banners: banners,
       );
       emit(StoreConfigLoaded(config));

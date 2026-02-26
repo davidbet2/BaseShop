@@ -36,6 +36,7 @@ function readFullConfig(db) {
     featured_title: config.featured_title || 'Colección destacada',
     featured_desc: config.featured_desc || 'Los productos más elegidos por nuestros clientes',
     primary_color_hex: config.primary_color_hex || 'F97316',
+    policies_content: config.policies_content || '',
     banners: banners.map(b => ({
       id: b.id,
       image_path: b.image_path,
@@ -75,6 +76,7 @@ configRouter.put(
     body('featured_title').optional().isString().isLength({ max: 200 }),
     body('featured_desc').optional().isString().isLength({ max: 500 }),
     body('primary_color_hex').optional().isString().matches(/^[0-9A-Fa-f]{6}$/),
+    body('policies_content').optional().isString().isLength({ max: 50000 }),
     body('banners').optional().isArray(),
     body('banners.*.image_path').optional({ nullable: true }).isString(),
     body('banners.*.product_id').optional({ nullable: true }).isString(),
@@ -95,6 +97,7 @@ configRouter.put(
         featured_title,
         featured_desc,
         primary_color_hex,
+        policies_content,
         banners,
       } = req.body;
 
@@ -112,6 +115,7 @@ configRouter.put(
       if (featured_title !== undefined) upsert.run('featured_title', featured_title);
       if (featured_desc !== undefined) upsert.run('featured_desc', featured_desc);
       if (primary_color_hex !== undefined) upsert.run('primary_color_hex', primary_color_hex.toUpperCase());
+      if (policies_content !== undefined) upsert.run('policies_content', policies_content);
 
       // Replace banners if provided
       if (banners !== undefined) {
