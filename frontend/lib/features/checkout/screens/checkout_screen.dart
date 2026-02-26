@@ -36,11 +36,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   static const _paymentMethods = [
     {'id': 'card', 'label': 'Tarjeta de crédito/débito', 'icon': Icons.credit_card_rounded, 'desc': 'Pago seguro con PayU · Visa, Mastercard, Amex'},
-    {'id': 'nequi', 'label': 'Nequi / Daviplata', 'icon': Icons.phone_android_rounded, 'desc': 'Pago seguro con PayU · Billetera digital'},
   ];
-
-  static const _payuLogoUrl = 'https://colombia.payu.com/wp-content/uploads/sites/2/2021/07/logo-payu.svg';
-  static const _payuLogoPngUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/PayU_2014_logo.svg/320px-PayU_2014_logo.svg.png';
 
   @override
   void initState() {
@@ -292,13 +288,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(color: const Color(0xFFE5E7EB)),
                         ),
-                        padding: const EdgeInsets.all(6),
-                        child: Image.network(
-                          _payuLogoPngUrl,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(method['icon'] as IconData, size: 22,
-                            color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
-                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: _buildPayULogo(),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -331,9 +322,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const SizedBox(width: 6),
               Text('Pagos procesados de forma segura por ',
                 style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-              Image.network(_payuLogoPngUrl, height: 18,
-                errorBuilder: (_, __, ___) => Text('PayU',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade600))),
+              _buildPayULogoInline(),
             ],
           ),
         ),
@@ -490,7 +479,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   context.read<CartBloc>().add(const ClearCart());
 
                   // For card/nequi, redirect to PayU checkout
-                  final needsOnlinePayment = _selectedPayment == 'card' || _selectedPayment == 'nequi';
+                  final needsOnlinePayment = _selectedPayment == 'card';
                   if (needsOnlinePayment) {
                     final order = state.order;
                     final orderId = (order['id'] ?? '').toString();
@@ -626,6 +615,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           onPressed: onPressed,
           child: Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         ),
+      ),
+    );
+  }
+
+  /// PayU logo rendered as styled text — reliable, no external image dependency.
+  Widget _buildPayULogo() {
+    return Center(
+      child: RichText(
+        text: const TextSpan(
+          children: [
+            TextSpan(text: 'Pay', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF86B817), letterSpacing: -0.5)),
+            TextSpan(text: 'U', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF49BF4E), letterSpacing: -0.5)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Inline PayU logo for the secure badge text.
+  Widget _buildPayULogoInline() {
+    return RichText(
+      text: const TextSpan(
+        children: [
+          TextSpan(text: 'Pay', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF86B817))),
+          TextSpan(text: 'U', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF49BF4E))),
+        ],
       ),
     );
   }

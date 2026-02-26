@@ -10,6 +10,7 @@ class PaymentsBloc extends Bloc<PaymentsEvent, PaymentsState> {
   PaymentsBloc(this.repository) : super(const PaymentsInitial()) {
     on<CreatePayment>(_onCreatePayment);
     on<CheckPaymentStatus>(_onCheckPaymentStatus);
+    on<ValidatePayUResponse>(_onValidatePayUResponse);
     on<ResetPayments>(_onReset);
   }
 
@@ -46,6 +47,24 @@ class PaymentsBloc extends Bloc<PaymentsEvent, PaymentsState> {
     emit(const PaymentsLoading());
     try {
       final data = await repository.getPaymentByOrder(event.orderId);
+      final status = (data['status'] ?? 'pending').toString();
+
+      emit(PaymentStatusLoaded(
+        payment: data,
+        status: status,
+      ));
+    } on Exception catch (e) {
+      emit(PaymentsError(e.toString().replaceFirst('Exception: ', '')));
+    }
+  }
+
+  Future<void> _onValidatePayUResponse(
+    ValidatePayUResponse event,
+    Emitter<PaymentsState> emit,
+  ) async {
+    emit(const PaymentsLoading());
+    try {
+      final data = await repository.validatePayUResponse(event.params);
       final status = (data['status'] ?? 'pending').toString();
 
       emit(PaymentStatusLoaded(

@@ -269,7 +269,8 @@ late final GoRouter appRouter = GoRouter(
           path: '/payment-result',
           builder: (context, state) {
             final orderId = state.uri.queryParameters['orderId'] ?? '';
-            return PaymentResultScreen(orderId: orderId);
+            final queryParams = Map<String, String>.from(state.uri.queryParameters);
+            return PaymentResultScreen(orderId: orderId, queryParams: queryParams);
           },
         ),
       ],

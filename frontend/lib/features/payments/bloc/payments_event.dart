@@ -39,6 +39,16 @@ class CheckPaymentStatus extends PaymentsEvent {
   List<Object?> get props => [orderId];
 }
 
+/// Validate PayU response params and update payment + order status.
+class ValidatePayUResponse extends PaymentsEvent {
+  final Map<String, dynamic> params;
+
+  const ValidatePayUResponse(this.params);
+
+  @override
+  List<Object?> get props => [params];
+}
+
 /// Reset bloc to initial state.
 class ResetPayments extends PaymentsEvent {
   const ResetPayments();

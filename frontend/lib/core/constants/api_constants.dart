@@ -48,6 +48,7 @@ class ApiConstants {
   // ── Payments ──
   static const String payments = '/payments';
   static const String createPayment = '/payments/create';
+  static const String validatePaymentResponse = '/payments/validate-response';
   static const String paymentStats = '/payments/stats/summary';
   static const String paymentByOrder = '/payments/order';
 

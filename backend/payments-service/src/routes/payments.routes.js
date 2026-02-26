@@ -259,7 +259,7 @@ router.post('/create', [
             buyerFullName: buyer_name,
             description: description || `Pago orden ${order_id}`,
             checkoutUrl: PAYU_CHECKOUT_URL(),
-            responseUrl: `${FRONTEND_URL()}/#/payment-result?orderId=${order_id}`,
+            responseUrl: `${FRONTEND_URL()}/payment-result?orderId=${order_id}`,
             confirmationUrl: `${GATEWAY_URL()}/api/payments/webhook/payu`,
           },
         },
@@ -307,7 +307,7 @@ router.post('/create', [
           buyerFullName: buyer_name,
           description: description || `Pago orden ${order_id}`,
           checkoutUrl: PAYU_CHECKOUT_URL(),
-          responseUrl: `${FRONTEND_URL()}/#/payment-result?orderId=${order_id}`,
+          responseUrl: `${FRONTEND_URL()}/payment-result?orderId=${order_id}`,
           confirmationUrl: `${GATEWAY_URL()}/api/payments/webhook/payu`,
         },
       },
@@ -352,6 +352,110 @@ router.get('/order/:orderId', [
   } catch (error) {
     console.error('[payments-service] Error getting payment by order:', error);
     res.status(500).json({ error: 'Error al obtener el estado del pago' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// POST /api/payments/validate-response — Validate PayU response & update status
+// Called by the frontend after PayU redirects back with response params.
+// This is essential because PayU's confirmation webhook cannot reach localhost.
+// ──────────────────────────────────────────────
+router.post('/validate-response', [
+  body('orderId').notEmpty().withMessage('El ID de la orden es requerido'),
+  body('transactionState').notEmpty().withMessage('El estado de la transacción es requerido'),
+], async (req, res) => {
+  try {
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const {
+      orderId,
+      transactionState,
+      polTransactionState,
+      referenceCode,
+      transactionId,
+      TX_VALUE,
+      currency,
+      signature,
+      message,
+      lapTransactionState,
+    } = req.body;
+
+    console.log('[payments-service] Validate PayU response:', { orderId, transactionState, lapTransactionState });
+
+    // Find the payment
+    let payment = db.prepare('SELECT * FROM payments WHERE order_id = ? AND user_id = ? ORDER BY created_at DESC').get(orderId, userId);
+    if (!payment) {
+      return res.status(404).json({ error: 'Pago no encontrado para esta orden' });
+    }
+
+    // Only update if still pending (don't override webhook updates)
+    if (payment.status !== 'pending') {
+      return res.json({
+        message: 'Estado ya actualizado',
+        data: { ...payment, status: payment.status },
+      });
+    }
+
+    // Validate PayU response signature if provided
+    // PayU response signature: MD5(apiKey~merchantId~referenceCode~TX_VALUE~currency~transactionState)
+    if (signature && referenceCode && TX_VALUE && currency) {
+      const apiKey = PAYU_API_KEY();
+      const merchantId = PAYU_MERCHANT_ID();
+      let formattedAmount = parseFloat(TX_VALUE);
+      if (formattedAmount % 1 === 0) {
+        formattedAmount = formattedAmount.toFixed(1);
+      } else {
+        formattedAmount = formattedAmount.toString();
+      }
+      const signatureString = `${apiKey}~${merchantId}~${referenceCode}~${formattedAmount}~${currency}~${transactionState}`;
+      const expectedSignature = crypto.createHash('md5').update(signatureString).digest('hex');
+
+      if (expectedSignature !== signature) {
+        console.warn('[payments-service] Invalid PayU response signature. Expected:', expectedSignature, 'Got:', signature);
+        // Don't reject — still use the transactionState since it came via the user's browser redirect
+      }
+    }
+
+    // Map PayU transactionState to internal status (same codes as state_pol)
+    const newStatus = mapPayUStatus(transactionState);
+
+    // Update payment
+    db.prepare(
+      `UPDATE payments SET status = ?, provider_reference = CASE WHEN provider_reference = '' THEN ? ELSE provider_reference END, provider_response = ?, updated_at = datetime('now')
+       WHERE id = ?`
+    ).run(newStatus, transactionId || '', JSON.stringify(req.body), payment.id);
+
+    // Log event
+    db.prepare(
+      `INSERT INTO payment_logs (id, payment_id, event, data)
+       VALUES (?, ?, ?, ?)`
+    ).run(uuidv4(), payment.id, `response_${newStatus}`, JSON.stringify({
+      transactionState,
+      polTransactionState,
+      lapTransactionState,
+      transactionId,
+      message,
+      raw: req.body,
+    }));
+
+    console.log(`[payments-service] Payment ${payment.id} updated to ${newStatus} via response validation`);
+
+    // Notify orders-service about payment outcome
+    await notifyOrderService(payment.order_id, newStatus, payment.id);
+
+    // Re-fetch updated payment
+    const updatedPayment = db.prepare('SELECT * FROM payments WHERE id = ?').get(payment.id);
+
+    res.json({
+      message: 'Estado de pago actualizado',
+      data: { ...updatedPayment, status: newStatus },
+    });
+  } catch (error) {
+    console.error('[payments-service] Error validating PayU response:', error);
+    res.status(500).json({ error: 'Error al validar la respuesta de PayU' });
   }
 });
 

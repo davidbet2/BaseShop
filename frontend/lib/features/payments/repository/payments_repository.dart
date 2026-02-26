@@ -58,4 +58,21 @@ class PaymentsRepository {
       throw Exception('Error de conexión con el servidor');
     }
   }
+
+  /// Validate PayU response params and update payment status.
+  /// Called after PayU redirects back to the app with response parameters.
+  Future<Map<String, dynamic>> validatePayUResponse(Map<String, dynamic> params) async {
+    try {
+      final response = await _apiClient.dio.post(
+        ApiConstants.validatePaymentResponse,
+        data: params,
+      );
+      return Map<String, dynamic>.from(response.data['data'] ?? response.data);
+    } on DioException catch (e) {
+      if (e.response?.data is Map) {
+        throw Exception(e.response!.data['error'] ?? 'Error al validar la respuesta');
+      }
+      throw Exception('Error de conexión con el servidor');
+    }
+  }
 }

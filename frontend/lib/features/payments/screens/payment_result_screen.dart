@@ -9,11 +9,17 @@ import 'package:baseshop/features/payments/bloc/payments_event.dart';
 import 'package:baseshop/features/payments/bloc/payments_state.dart';
 
 /// Screen shown after PayU redirects back to the app.
-/// Checks payment status and shows result.
+/// Parses PayU response query params, validates via backend, and shows result.
 class PaymentResultScreen extends StatefulWidget {
   final String orderId;
+  /// All query parameters from the URL (includes PayU response params).
+  final Map<String, String> queryParams;
 
-  const PaymentResultScreen({super.key, required this.orderId});
+  const PaymentResultScreen({
+    super.key,
+    required this.orderId,
+    this.queryParams = const {},
+  });
 
   @override
   State<PaymentResultScreen> createState() => _PaymentResultScreenState();
@@ -22,12 +28,49 @@ class PaymentResultScreen extends StatefulWidget {
 class _PaymentResultScreenState extends State<PaymentResultScreen> {
   late final PaymentsBloc _paymentsBloc;
 
+  /// Immediate status from PayU's transactionState (before backend confirms).
+  String? _immediateStatus;
+
   @override
   void initState() {
     super.initState();
     _paymentsBloc = getIt<PaymentsBloc>();
-    // Check payment status
-    _paymentsBloc.add(CheckPaymentStatus(widget.orderId));
+
+    // Parse PayU response params for immediate feedback
+    final transactionState = widget.queryParams['transactionState'] ?? '';
+    final lapTransactionState = widget.queryParams['lapTransactionState'] ?? '';
+
+    if (transactionState.isNotEmpty) {
+      // Map PayU transactionState: 4=approved, 6=declined, 5=expired, 7=pending
+      _immediateStatus = _mapPayUState(transactionState);
+
+      // Send params to backend to validate & update payment + order status
+      _paymentsBloc.add(ValidatePayUResponse({
+        'orderId': widget.orderId,
+        'transactionState': transactionState,
+        'polTransactionState': widget.queryParams['polTransactionState'] ?? '',
+        'referenceCode': widget.queryParams['referenceCode'] ?? '',
+        'transactionId': widget.queryParams['transactionId'] ?? '',
+        'TX_VALUE': widget.queryParams['TX_VALUE'] ?? '',
+        'currency': widget.queryParams['currency'] ?? '',
+        'signature': widget.queryParams['signature'] ?? '',
+        'message': widget.queryParams['message'] ?? '',
+        'lapTransactionState': lapTransactionState,
+      }));
+    } else {
+      // No PayU params — just query our API for current status
+      _paymentsBloc.add(CheckPaymentStatus(widget.orderId));
+    }
+  }
+
+  String _mapPayUState(String transactionState) {
+    switch (transactionState) {
+      case '4': return 'approved';
+      case '6': return 'declined';
+      case '5': return 'expired';
+      case '7': return 'pending';
+      default: return 'error';
+    }
   }
 
   @override
@@ -50,8 +93,9 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
         ),
         body: BlocBuilder<PaymentsBloc, PaymentsState>(
           builder: (context, state) {
-            if (state is PaymentsLoading || state is PaymentsInitial) {
-              return _buildLoading(colorScheme);
+            // Show immediate result from PayU params while backend validates
+            if (_immediateStatus != null && (state is PaymentsLoading || state is PaymentsInitial)) {
+              return _buildResult(context, _immediateStatus!, {}, isValidating: true);
             }
 
             if (state is PaymentStatusLoaded) {
@@ -59,6 +103,10 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
             }
 
             if (state is PaymentsError) {
+              // If we have immediate status, show that even on error
+              if (_immediateStatus != null) {
+                return _buildResult(context, _immediateStatus!, {});
+              }
               return _buildResult(context, 'pending', {});
             }
 
@@ -87,7 +135,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
     );
   }
 
-  Widget _buildResult(BuildContext context, String status, Map<String, dynamic> payment) {
+  Widget _buildResult(BuildContext context, String status, Map<String, dynamic> payment, {bool isValidating = false}) {
     final isApproved = status == 'approved';
     final isPending = status == 'pending';
     final isDeclined = status == 'declined' || status == 'expired' || status == 'error';
@@ -136,6 +184,19 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
             Text(subtitle, textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 15, color: AppTheme.textSecondary, height: 1.5)),
 
+            if (isValidating) ...[
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(width: 14, height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: color)),
+                  const SizedBox(width: 8),
+                  Text('Confirmando con el servidor...', style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
+                ],
+              ),
+            ],
+
             if (payment.isNotEmpty) ...[
               const SizedBox(height: 24),
               Container(
@@ -169,14 +230,13 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
               ),
             ),
 
-            if (isDeclined) ...[
+            if (isPending || isDeclined) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: OutlinedButton(
                   onPressed: () {
-                    // Retry — reload payment status or go back to checkout
                     _paymentsBloc.add(CheckPaymentStatus(widget.orderId));
                   },
                   child: const Text('Verificar de nuevo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
