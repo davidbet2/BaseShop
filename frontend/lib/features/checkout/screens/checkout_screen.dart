@@ -35,11 +35,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   bool _placingOrder = false;
 
   static const _paymentMethods = [
-    {'id': 'cash', 'label': 'Efectivo / Contra entrega', 'icon': Icons.money_rounded, 'desc': 'Paga al recibir tu pedido'},
-    {'id': 'transfer', 'label': 'Transferencia bancaria', 'icon': Icons.account_balance_rounded, 'desc': 'Transferencia o depósito'},
-    {'id': 'card', 'label': 'Tarjeta de crédito/débito', 'icon': Icons.credit_card_rounded, 'desc': 'Pago seguro con PayU · Visa, Mastercard, etc.'},
+    {'id': 'card', 'label': 'Tarjeta de crédito/débito', 'icon': Icons.credit_card_rounded, 'desc': 'Pago seguro con PayU · Visa, Mastercard, Amex'},
     {'id': 'nequi', 'label': 'Nequi / Daviplata', 'icon': Icons.phone_android_rounded, 'desc': 'Pago seguro con PayU · Billetera digital'},
   ];
+
+  static const _payuLogoUrl = 'https://colombia.payu.com/wp-content/uploads/sites/2/2021/07/logo-payu.svg';
+  static const _payuLogoPngUrl = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/PayU_2014_logo.svg/320px-PayU_2014_logo.svg.png';
 
   @override
   void initState() {
@@ -285,13 +286,19 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Row(
                     children: [
                       Container(
-                        width: 44, height: 44,
+                        width: 48, height: 48,
                         decoration: BoxDecoration(
-                          color: selected ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1) : const Color(0xFFF3F4F6),
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
                         ),
-                        child: Icon(method['icon'] as IconData, size: 22,
-                          color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
+                        padding: const EdgeInsets.all(6),
+                        child: Image.network(
+                          _payuLogoPngUrl,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(method['icon'] as IconData, size: 22,
+                            color: selected ? Theme.of(context).colorScheme.primary : AppTheme.textSecondary),
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -312,6 +319,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 ),
               );
             },
+          ),
+        ),
+        // PayU secure badge
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.lock_rounded, size: 14, color: Colors.grey.shade500),
+              const SizedBox(width: 6),
+              Text('Pagos procesados de forma segura por ',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              Image.network(_payuLogoPngUrl, height: 18,
+                errorBuilder: (_, __, ___) => Text('PayU',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.grey.shade600))),
+            ],
           ),
         ),
         // Notes field
@@ -479,7 +502,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     String buyerName = '';
                     if (authState is AuthAuthenticated) {
                       buyerEmail = (authState.user['email'] ?? '').toString();
-                      buyerName = (authState.user['name'] ?? authState.user['full_name'] ?? '').toString();
+                      final firstName = (authState.user['first_name'] ?? '').toString();
+                      final lastName = (authState.user['last_name'] ?? '').toString();
+                      buyerName = '$firstName $lastName'.trim();
+                    }
+                    // Fallback: use the shipping address name
+                    if (buyerName.isEmpty && _selectedAddressIndex >= 0) {
+                      buyerName = (_addresses[_selectedAddressIndex]['name'] ?? '').toString();
                     }
 
                     context.go('/payu-checkout', extra: {
