@@ -17,6 +17,9 @@ import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/orders/repository/orders_repository.dart';
 import 'package:baseshop/features/orders/bloc/orders_bloc.dart';
 
+import 'package:baseshop/features/payments/repository/payments_repository.dart';
+import 'package:baseshop/features/payments/bloc/payments_bloc.dart';
+
 import 'package:baseshop/features/reviews/repository/reviews_repository.dart';
 
 import 'package:baseshop/features/favorites/repository/favorites_repository.dart';
@@ -53,6 +56,10 @@ void configureDependencies() {
     () => OrdersRepository(getIt<ApiClient>()),
   );
 
+  getIt.registerLazySingleton<PaymentsRepository>(
+    () => PaymentsRepository(getIt<ApiClient>()),
+  );
+
   getIt.registerLazySingleton<ReviewsRepository>(
     () => ReviewsRepository(getIt<ApiClient>()),
   );
@@ -80,6 +87,11 @@ void configureDependencies() {
   // Factory: new instance per screen
   getIt.registerFactory<OrdersBloc>(
     () => OrdersBloc(getIt<OrdersRepository>()),
+  );
+
+  // Factory: new instance per payment flow
+  getIt.registerFactory<PaymentsBloc>(
+    () => PaymentsBloc(getIt<PaymentsRepository>()),
   );
 
   // Singleton: heart icon state shared across app

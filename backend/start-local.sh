@@ -36,10 +36,13 @@ start_service() {
 
   if [ "$name" = "payments-service" ]; then
     export PAYU_IS_TEST="true"
-    export PAYU_API_KEY=""
-    export PAYU_API_LOGIN=""
-    export PAYU_MERCHANT_ID=""
-    export PAYU_ACCOUNT_ID=""
+    export PAYU_API_KEY="4Vj8eK4rloUd272L48hsrarnUA"
+    export PAYU_API_LOGIN="pRRXKOl8ikMmt9u"
+    export PAYU_MERCHANT_ID="508029"
+    export PAYU_ACCOUNT_ID="512321"
+    export ORDERS_SERVICE_URL="http://localhost:3005"
+    export FRONTEND_URL="http://localhost:8080"
+    export GATEWAY_URL="http://localhost:3000"
   fi
 
   if [ "$name" = "api-gateway" ]; then

@@ -30,6 +30,46 @@ const PAYU_API_URL = () =>
     ? 'https://sandbox.api.payulatam.com/payments-api/4.0/service.cgi'
     : 'https://api.payulatam.com/payments-api/4.0/service.cgi';
 
+const PAYU_CHECKOUT_URL = () =>
+  PAYU_IS_TEST()
+    ? 'https://sandbox.checkout.payulatam.com/ppp-web-gateway-payu/'
+    : 'https://checkout.payulatam.com/ppp-web-gateway-payu/';
+
+const FRONTEND_URL = () => process.env.FRONTEND_URL || 'http://localhost:8080';
+const GATEWAY_URL = () => process.env.GATEWAY_URL || 'http://localhost:3000';
+
+const ORDERS_SERVICE_URL = () => process.env.ORDERS_SERVICE_URL || 'http://localhost:3005';
+
+// Notify orders-service about payment status change
+async function notifyOrderService(orderId, paymentStatus, paymentId) {
+  try {
+    // Map payment status to order status
+    const orderStatusMap = {
+      approved: 'confirmed',
+      declined: 'cancelled',
+      expired: 'cancelled',
+    };
+    const newOrderStatus = orderStatusMap[paymentStatus];
+    if (!newOrderStatus) return; // Don't update order for pending/error
+
+    const url = `${ORDERS_SERVICE_URL()}/api/orders/${orderId}/payment-status`;
+    await axios.patch(url, {
+      status: newOrderStatus,
+      payment_id: paymentId,
+      payment_status: paymentStatus,
+      note: paymentStatus === 'approved'
+        ? 'Pago confirmado por PayU'
+        : `Pago ${paymentStatus === 'declined' ? 'rechazado' : 'expirado'} por PayU`,
+    }, {
+      headers: { 'X-Internal-Service': 'payments-service' },
+      timeout: 5000,
+    });
+    console.log(`[payments-service] Notified orders-service: order ${orderId} → ${newOrderStatus}`);
+  } catch (err) {
+    console.error(`[payments-service] Failed to notify orders-service for order ${orderId}:`, err.message);
+  }
+}
+
 // PayU signature: MD5(apiKey~merchantId~referenceCode~amount~currency)
 function generatePayUSignature(referenceCode, amount, currency) {
   const apiKey = PAYU_API_KEY();
@@ -73,7 +113,7 @@ const VALID_STATUSES = ['pending', 'approved', 'declined', 'expired', 'error', '
 // ──────────────────────────────────────────────
 // POST /api/payments/webhook/payu — PayU confirmation
 // ──────────────────────────────────────────────
-router.post('/webhook/payu', (req, res) => {
+router.post('/webhook/payu', async (req, res) => {
   try {
     const db = getDb();
     const {
@@ -141,6 +181,10 @@ router.post('/webhook/payu', (req, res) => {
     }));
 
     console.log(`[payments-service] Payment ${payment.id} updated to ${newStatus}`);
+
+    // Notify orders-service about payment outcome
+    await notifyOrderService(payment.order_id, newStatus, payment.id);
+
     res.json({ message: 'OK' });
   } catch (error) {
     console.error('[payments-service] Error processing PayU webhook:', error);
@@ -206,13 +250,17 @@ router.post('/create', [
             accountId: PAYU_ACCOUNT_ID(),
             referenceCode,
             amount: existingPayment.amount,
+            tax: '0',
+            taxReturnBase: '0',
             currency: existingPayment.currency,
             signature,
             test: PAYU_IS_TEST() ? '1' : '0',
             buyerEmail: buyer_email,
             buyerFullName: buyer_name,
             description: description || `Pago orden ${order_id}`,
-            apiUrl: PAYU_API_URL(),
+            checkoutUrl: PAYU_CHECKOUT_URL(),
+            responseUrl: `${FRONTEND_URL()}/#/payment-result?orderId=${order_id}`,
+            confirmationUrl: `${GATEWAY_URL()}/api/payments/webhook/payu`,
           },
         },
       });
@@ -250,13 +298,17 @@ router.post('/create', [
           accountId: PAYU_ACCOUNT_ID(),
           referenceCode,
           amount,
+          tax: '0',
+          taxReturnBase: '0',
           currency,
           signature,
           test: PAYU_IS_TEST() ? '1' : '0',
           buyerEmail: buyer_email,
           buyerFullName: buyer_name,
           description: description || `Pago orden ${order_id}`,
-          apiUrl: PAYU_API_URL(),
+          checkoutUrl: PAYU_CHECKOUT_URL(),
+          responseUrl: `${FRONTEND_URL()}/#/payment-result?orderId=${order_id}`,
+          confirmationUrl: `${GATEWAY_URL()}/api/payments/webhook/payu`,
         },
       },
     });

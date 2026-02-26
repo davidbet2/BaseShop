@@ -7,6 +7,8 @@ import 'dart:convert';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
+import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
+import 'package:baseshop/features/auth/bloc/auth_state.dart';
 import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/cart/bloc/cart_event.dart';
 import 'package:baseshop/features/cart/bloc/cart_state.dart';
@@ -463,15 +465,42 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 if (state is OrderCreated) {
                   setState(() => _placingOrder = false);
                   context.read<CartBloc>().add(const ClearCart());
-                  context.go('/orders');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('¡Pedido realizado con éxito! 🎉'),
-                      backgroundColor: AppTheme.successColor,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  );
+
+                  // For card/nequi, redirect to PayU checkout
+                  final needsOnlinePayment = _selectedPayment == 'card' || _selectedPayment == 'nequi';
+                  if (needsOnlinePayment) {
+                    final order = state.order;
+                    final orderId = (order['id'] ?? '').toString();
+                    final orderTotal = double.tryParse(order['total']?.toString() ?? '0') ?? total;
+
+                    // Get buyer info from auth state
+                    final authState = getIt<AuthBloc>().state;
+                    String buyerEmail = '';
+                    String buyerName = '';
+                    if (authState is AuthAuthenticated) {
+                      buyerEmail = (authState.user['email'] ?? '').toString();
+                      buyerName = (authState.user['name'] ?? authState.user['full_name'] ?? '').toString();
+                    }
+
+                    context.go('/payu-checkout', extra: {
+                      'orderId': orderId,
+                      'amount': orderTotal,
+                      'buyerEmail': buyerEmail,
+                      'buyerName': buyerName,
+                      'paymentMethod': _selectedPayment,
+                    });
+                  } else {
+                    // For cash/transfer, go directly to orders
+                    context.go('/orders');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('¡Pedido realizado con éxito! 🎉'),
+                        backgroundColor: AppTheme.successColor,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
                 } else if (state is OrdersError) {
                   setState(() => _placingOrder = false);
                   _showSnack(state.message);

@@ -23,6 +23,8 @@ import 'package:baseshop/features/profile/screens/profile_screen.dart';
 import 'package:baseshop/features/profile/screens/addresses_screen.dart';
 
 import 'package:baseshop/features/checkout/screens/checkout_screen.dart';
+import 'package:baseshop/features/payments/screens/payu_checkout_screen.dart';
+import 'package:baseshop/features/payments/screens/payment_result_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_products_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_orders_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_dashboard_screen.dart';
@@ -35,6 +37,8 @@ const _authRequiredPaths = <String>{
   '/orders',
   '/profile',
   '/checkout',
+  '/payu-checkout',
+  '/payment-result',
   '/addresses',
   '/admin/dashboard',
   '/admin/products',
@@ -229,6 +233,26 @@ late final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/checkout',
       builder: (context, state) => const CheckoutScreen(),
+    ),
+    GoRoute(
+      path: '/payu-checkout',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return PayuCheckoutScreen(
+          orderId: extra['orderId']?.toString() ?? '',
+          amount: (extra['amount'] as num?)?.toDouble() ?? 0,
+          buyerEmail: extra['buyerEmail']?.toString() ?? '',
+          buyerName: extra['buyerName']?.toString() ?? '',
+          paymentMethod: extra['paymentMethod']?.toString() ?? '',
+        );
+      },
+    ),
+    GoRoute(
+      path: '/payment-result',
+      builder: (context, state) {
+        final orderId = state.uri.queryParameters['orderId'] ?? '';
+        return PaymentResultScreen(orderId: orderId);
+      },
     ),
     GoRoute(
       path: '/addresses',

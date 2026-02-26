@@ -29,7 +29,72 @@ const VALID_TRANSITIONS = {
 
 const VALID_STATUSES = Object.keys(VALID_TRANSITIONS);
 
-// Todas las rutas requieren autenticación
+// ══════════════════════════════════════════════
+//  INTERNAL SERVICE-TO-SERVICE ROUTES (no JWT)
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// PATCH /api/orders/:id/payment-status — Update order status from payments-service
+// ──────────────────────────────────────────────
+router.patch('/:id/payment-status', [
+  param('id').notEmpty().withMessage('El ID del pedido es requerido'),
+  body('status').notEmpty().isIn(VALID_STATUSES).withMessage('Estado inválido'),
+  body('payment_id').optional().isString(),
+  body('payment_status').optional().isString(),
+  body('note').optional().isString(),
+], (req, res) => {
+  try {
+    // Verify internal service header
+    const internalHeader = req.headers['x-internal-service'];
+    if (!internalHeader) {
+      return res.status(403).json({ error: 'Acceso no autorizado' });
+    }
+
+    const validationError = handleValidation(req, res);
+    if (validationError) return;
+
+    const db = getDb();
+    const { id } = req.params;
+    const { status: newStatus, payment_id, payment_status, note } = req.body;
+
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    if (!order) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    // Validate transition
+    const allowedTransitions = VALID_TRANSITIONS[order.status] || [];
+    if (!allowedTransitions.includes(newStatus)) {
+      return res.status(400).json({
+        error: `Transición no permitida: ${order.status} → ${newStatus}`,
+      });
+    }
+
+    // Update order status and payment_id
+    db.prepare(
+      "UPDATE orders SET status = ?, payment_id = CASE WHEN ? != '' THEN ? ELSE payment_id END, updated_at = datetime('now') WHERE id = ?"
+    ).run(newStatus, payment_id || '', payment_id || '', id);
+
+    // Log in status history
+    db.prepare(
+      `INSERT INTO order_status_history (id, order_id, status, note, changed_by)
+       VALUES (?, ?, ?, ?, 'payments-service')`
+    ).run(uuidv4(), id, newStatus, note || `Pago ${payment_status || newStatus}`);
+
+    const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    console.log(`[orders-service] Order ${id} updated to ${newStatus} by payments-service`);
+
+    res.json({
+      message: `Estado actualizado a '${newStatus}'`,
+      data: updatedOrder,
+    });
+  } catch (error) {
+    console.error('[orders-service] Error updating order from payment:', error);
+    res.status(500).json({ error: 'Error al actualizar el pedido' });
+  }
+});
+
+// Todas las rutas siguientes requieren autenticación
 router.use(authMiddleware);
 
 // ══════════════════════════════════════════════
