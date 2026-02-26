@@ -212,34 +212,46 @@ late final GoRouter appRouter = GoRouter(
             child: AdminPoliciesScreen(),
           ),
         ),
+        GoRoute(
+          path: '/products/:id',
+          builder: (context, state) {
+            final productId = state.pathParameters['id']!;
+            return BlocProvider(
+              create: (_) => getIt<ProductsBloc>(),
+              child: ProductDetailScreen(productId: productId),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/orders/:id',
+          builder: (context, state) {
+            final orderId = state.pathParameters['id']!;
+            return OrderDetailScreen(orderId: orderId);
+          },
+        ),
+        GoRoute(
+          path: '/admin/orders/:id',
+          builder: (context, state) {
+            final orderId = state.pathParameters['id']!;
+            return AdminOrderDetailScreen(orderId: orderId);
+          },
+        ),
+        GoRoute(
+          path: '/addresses',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AddressesScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/policies',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: PoliciesScreen(),
+          ),
+        ),
       ],
     ),
 
-    // ── Full-screen routes (outside shell) ───────────────────
-    GoRoute(
-      path: '/products/:id',
-      builder: (context, state) {
-        final productId = state.pathParameters['id']!;
-        return BlocProvider(
-          create: (_) => getIt<ProductsBloc>(),
-          child: ProductDetailScreen(productId: productId),
-        );
-      },
-    ),
-    GoRoute(
-      path: '/orders/:id',
-      builder: (context, state) {
-        final orderId = state.pathParameters['id']!;
-        return OrderDetailScreen(orderId: orderId);
-      },
-    ),
-    GoRoute(
-      path: '/admin/orders/:id',
-      builder: (context, state) {
-        final orderId = state.pathParameters['id']!;
-        return AdminOrderDetailScreen(orderId: orderId);
-      },
-    ),
+    // ── Full-screen routes (outside shell — payment flows) ───
     GoRoute(
       path: '/checkout',
       builder: (context, state) => const CheckoutScreen(),
@@ -263,14 +275,6 @@ late final GoRouter appRouter = GoRouter(
         final orderId = state.uri.queryParameters['orderId'] ?? '';
         return PaymentResultScreen(orderId: orderId);
       },
-    ),
-    GoRoute(
-      path: '/addresses',
-      builder: (context, state) => const AddressesScreen(),
-    ),
-    GoRoute(
-      path: '/policies',
-      builder: (context, state) => const PoliciesScreen(),
     ),
   ],
 );

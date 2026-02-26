@@ -305,19 +305,33 @@ class _WebHeaderBar extends StatelessWidget {
           child: BlocBuilder<CartBloc, CartState>(
             builder: (_, cartState) {
               final count = cartState is CartLoaded ? cartState.items.length : 0;
-              return Badge(
-                isLabelVisible: count > 0,
-                label: Text('$count', style: const TextStyle(fontSize: 10)),
-                backgroundColor: primary,
-                child: Text(
-                  'Carrito',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                    color: isActive ? primary : AppTheme.textSecondary,
-                    letterSpacing: 0.2,
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Carrito',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: isActive ? primary : AppTheme.textSecondary,
+                      letterSpacing: 0.2,
+                    ),
                   ),
-                ),
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ],
               );
             },
           ),

@@ -69,10 +69,10 @@ class _HomeScreenState extends State<HomeScreen> {
             final primary = config?.primaryColor ?? AppTheme.defaultPrimary;
             return BlocBuilder<ProductsBloc, ProductsState>(
               builder: (context, state) {
-                if (state is ProductsLoading) return Center(child: CircularProgressIndicator(color: primary));
+                if (state is ProductsLoading || state is ProductsInitial) return Center(child: CircularProgressIndicator(color: primary));
                 if (state is ProductsError) return _buildError(state.message);
                 if (state is ProductsLoaded) return _buildLanding(context, state, config, primary);
-                return const SizedBox.shrink();
+                return Center(child: CircularProgressIndicator(color: primary));
               },
             );
           },
@@ -229,11 +229,33 @@ class _HomeScreenState extends State<HomeScreen> {
       child = BlocBuilder<CartBloc, CartState>(
         builder: (_, cartState) {
           final count = cartState is CartLoaded ? cartState.items.length : 0;
-          return Badge(
-            isLabelVisible: count > 0,
-            label: Text('$count', style: const TextStyle(fontSize: 10)),
-            backgroundColor: primary,
-            child: child,
+          return Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive ? primary : AppTheme.textSecondary,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              if (count > 0) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ],
           );
         },
       );
