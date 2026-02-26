@@ -18,11 +18,11 @@ function handleValidation(req, res) {
   return null;
 }
 
-// PayU Configuration
-const PAYU_API_KEY = () => process.env.PAYU_API_KEY || '';
-const PAYU_API_LOGIN = () => process.env.PAYU_API_LOGIN || '';
-const PAYU_MERCHANT_ID = () => process.env.PAYU_MERCHANT_ID || '';
-const PAYU_ACCOUNT_ID = () => process.env.PAYU_ACCOUNT_ID || '';
+// PayU Configuration (defaults are PayU Sandbox/test credentials)
+const PAYU_API_KEY = () => process.env.PAYU_API_KEY || '4Vj8eK4rloUd272L48hsrarnUA';
+const PAYU_API_LOGIN = () => process.env.PAYU_API_LOGIN || 'pRRXKOl8ikMmt9u';
+const PAYU_MERCHANT_ID = () => process.env.PAYU_MERCHANT_ID || '508029';
+const PAYU_ACCOUNT_ID = () => process.env.PAYU_ACCOUNT_ID || '512321';
 const PAYU_IS_TEST = () => (process.env.PAYU_IS_TEST || 'true') === 'true';
 
 const PAYU_API_URL = () =>
