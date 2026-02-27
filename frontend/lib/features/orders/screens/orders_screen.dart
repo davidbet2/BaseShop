@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
@@ -20,6 +22,8 @@ class OrdersScreen extends StatefulWidget {
 class _OrdersScreenState extends State<OrdersScreen> {
   late final OrdersBloc _bloc;
   String? _selectedStatus;
+  int _page = 1;
+  static const _limit = 20;
 
   final _currencyFormat = NumberFormat.currency(
     locale: 'es_CO',
@@ -36,11 +40,21 @@ class _OrdersScreenState extends State<OrdersScreen> {
     'cancelled': 'Cancelados',
   };
 
+  static const _statusIcons = <String, IconData>{
+    'pending': Icons.schedule,
+    'confirmed': Icons.check_circle_outline,
+    'processing': Icons.autorenew,
+    'shipped': Icons.local_shipping_outlined,
+    'delivered': Icons.done_all,
+    'cancelled': Icons.cancel_outlined,
+    'refunded': Icons.replay,
+  };
+
   @override
   void initState() {
     super.initState();
     _bloc = getIt<OrdersBloc>();
-    _bloc.add(const LoadMyOrders());
+    _loadOrders();
   }
 
   @override
@@ -49,11 +63,16 @@ class _OrdersScreenState extends State<OrdersScreen> {
     super.dispose();
   }
 
+  void _loadOrders() {
+    _bloc.add(LoadMyOrders(status: _selectedStatus, page: _page));
+  }
+
   void _onStatusSelected(String key) {
     setState(() {
       _selectedStatus = key == 'all' ? null : key;
+      _page = 1;
     });
-    _bloc.add(LoadMyOrders(status: _selectedStatus));
+    _loadOrders();
   }
 
   @override
@@ -122,30 +141,94 @@ class _OrdersScreenState extends State<OrdersScreen> {
   }
 
   Widget _buildOrdersList(OrdersLoaded state) {
-    return RefreshIndicator(
-      onRefresh: () async {
-        _bloc.add(LoadMyOrders(status: _selectedStatus));
-        await _bloc.stream.firstWhere((s) => s is! OrdersLoading);
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: state.orders.length,
-        itemBuilder: (context, index) {
-          final order = state.orders[index];
-          return _buildOrderCard(context, order);
-        },
+    final totalPages = (state.total / _limit).ceil().clamp(1, 999);
+
+    return Column(
+      children: [
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              _loadOrders();
+              await _bloc.stream.firstWhere((s) => s is! OrdersLoading);
+            },
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: state.orders.length,
+              itemBuilder: (context, index) {
+                final order = state.orders[index];
+                return _buildOrderCard(context, order);
+              },
+            ),
+          ),
+        ),
+        if (totalPages > 1) _buildPaginationBar(totalPages),
+      ],
+    );
+  }
+
+  Widget _buildPaginationBar(int totalPages) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _page > 1
+                ? () {
+                    setState(() => _page--);
+                    _loadOrders();
+                  }
+                : null,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Página $_page de $totalPages',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _page < totalPages
+                ? () {
+                    setState(() => _page++);
+                    _loadOrders();
+                  }
+                : null,
+          ),
+        ],
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _parseItems(dynamic raw) {
+    if (raw is List) {
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    if (raw is String && raw.isNotEmpty) {
+      try {
+        final decoded = json.decode(raw);
+        if (decoded is List) {
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      } catch (_) {}
+    }
+    return [];
   }
 
   Widget _buildOrderCard(BuildContext context, Map<String, dynamic> order) {
     final orderId = (order['_id'] ?? order['id'] ?? '').toString();
     final orderNumber =
-        (order['orderNumber'] ?? order['order_number'] ?? orderId)
-            .toString();
+        (order['orderNumber'] ?? order['order_number'] ?? orderId).toString();
     final status = (order['status'] ?? 'pending').toString();
     final total = (order['total'] ?? 0) as num;
-    final itemCount = (order['items'] as List?)?.length ?? 0;
+    final items = _parseItems(order['items']);
+    final itemCount = order['items_count'] ?? items.length;
+    final statusIcon = _statusIcons[status] ?? Icons.help_outline;
 
     String dateStr = '';
     final createdAt = order['createdAt'] ?? order['created_at'];
@@ -160,14 +243,20 @@ class _OrdersScreenState extends State<OrdersScreen> {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => context.push('/orders/$orderId'),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Row 1: Order number + status badge
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -176,7 +265,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
                       'Pedido #$orderNumber',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                        fontSize: 15,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -186,30 +275,91 @@ class _OrdersScreenState extends State<OrdersScreen> {
               ),
               if (dateStr.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(
-                  dateStr,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 13,
-                  ),
+                Row(
+                  children: [
+                    Icon(Icons.calendar_today, size: 13, color: Colors.grey.shade500),
+                    const SizedBox(width: 4),
+                    Text(
+                      dateStr,
+                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    ),
+                  ],
                 ),
               ],
-              const Divider(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '$itemCount artículo${itemCount != 1 ? 's' : ''}',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 14,
+
+              // Product thumbnails + names
+              if (items.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                ...items.take(3).map((item) {
+                  final productName = (item['product_name'] ?? item['name'] ?? 'Producto').toString();
+                  final productImage = (item['product_image'] ?? item['image'] ?? '').toString();
+                  final qty = item['quantity'] ?? 1;
+                  final price = (item['product_price'] ?? item['price'] ?? 0) as num;
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: productImage.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: productImage,
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => _imgPlaceholder(40),
+                                )
+                              : _imgPlaceholder(40),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                productName,
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'x$qty · ${_currencyFormat.format(price)}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                if (itemCount > 3)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      '+${itemCount - 3} producto${(itemCount - 3) != 1 ? 's' : ''} más',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
                     ),
                   ),
+              ],
+
+              const Divider(height: 16),
+              // Bottom row: item count + total + status icon
+              Row(
+                children: [
+                  Icon(statusIcon, size: 15, color: Colors.grey.shade400),
+                  const SizedBox(width: 6),
+                  Text(
+                    '$itemCount artículo${itemCount != 1 ? 's' : ''}',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                  ),
+                  const Spacer(),
                   Text(
                     _currencyFormat.format(total),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: 17,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
@@ -222,21 +372,40 @@ class _OrdersScreenState extends State<OrdersScreen> {
     );
   }
 
+  Widget _imgPlaceholder(double size) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Icon(Icons.inventory_2, color: Colors.grey.shade400, size: size * 0.5),
+    );
+  }
+
   Widget _buildStatusBadge(String status) {
     final config = _statusConfig(status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: config.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        config.label,
-        style: TextStyle(
-          color: config.color,
-          fontWeight: FontWeight.w600,
-          fontSize: 12,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_statusIcons[status] ?? Icons.help_outline, size: 13, color: config.color),
+          const SizedBox(width: 4),
+          Text(
+            config.label,
+            style: TextStyle(
+              color: config.color,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -304,8 +473,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
           Text(message, textAlign: TextAlign.center),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: () =>
-                _bloc.add(LoadMyOrders(status: _selectedStatus)),
+            onPressed: () => _loadOrders(),
             child: const Text('Reintentar'),
           ),
         ],
@@ -323,7 +491,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
         itemBuilder: (_, __) => Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Container(
-            height: 120,
+            height: 160,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),

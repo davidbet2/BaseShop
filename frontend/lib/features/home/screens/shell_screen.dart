@@ -11,6 +11,9 @@ import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
 import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/cart/bloc/cart_state.dart';
+import 'package:baseshop/features/notifications/bloc/notifications_bloc.dart';
+import 'package:baseshop/features/notifications/bloc/notifications_event.dart';
+import 'package:baseshop/features/notifications/bloc/notifications_state.dart';
 
 class ShellScreen extends StatelessWidget {
   final Widget child;
@@ -29,7 +32,7 @@ class ShellScreen extends StatelessWidget {
     _NavItem(icon: Icons.storefront_outlined, selectedIcon: Icons.storefront_rounded, label: 'Tienda', path: '/products'),
     _NavItem(icon: Icons.shopping_bag_outlined, selectedIcon: Icons.shopping_bag_rounded, label: 'Carrito', path: '/cart'),
     _NavItem(icon: Icons.receipt_outlined, selectedIcon: Icons.receipt_rounded, label: 'Pedidos', path: '/orders'),
-    _NavItem(icon: Icons.policy_outlined, selectedIcon: Icons.policy_rounded, label: 'Políticas', path: '/policies'),
+    _NavItem(icon: Icons.notifications_outlined, selectedIcon: Icons.notifications_rounded, label: 'Avisos', path: '/notifications'),
     _NavItem(icon: Icons.person_outline_rounded, selectedIcon: Icons.person_rounded, label: 'Perfil', path: '/profile'),
   ];
 
@@ -230,6 +233,8 @@ class _WebHeaderBar extends StatelessWidget {
             _cartNavLink(context, primary, location),
             const SizedBox(width: 6),
             _navLink(context, 'Pedidos', Icons.receipt_outlined, '/orders', primary, location),
+            const SizedBox(width: 6),
+            _notificationBell(context, primary, location),
           ],
 
           if (isAdmin) ...[
@@ -289,6 +294,38 @@ class _WebHeaderBar extends StatelessWidget {
               color: isActive ? primary : AppTheme.textSecondary,
               letterSpacing: 0.2,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _notificationBell(BuildContext context, Color primary, String location) {
+    final isActive = location.startsWith('/notifications');
+
+    // Trigger a count refresh each time the header is built
+    try {
+      if (getIt.isRegistered<NotificationsBloc>()) {
+        // Use a factory so we need to get it fresh — but we want a lightweight check.
+        // Instead, use the repository directly for the badge.
+      }
+    } catch (_) {}
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () => context.go('/notifications'),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? primary.withValues(alpha: 0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isActive ? Icons.notifications_rounded : Icons.notifications_outlined,
+            color: isActive ? primary : AppTheme.textSecondary,
+            size: 22,
           ),
         ),
       ),

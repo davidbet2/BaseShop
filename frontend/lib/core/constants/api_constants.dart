@@ -45,6 +45,11 @@ class ApiConstants {
   static const String myOrders = '/orders/me';
   static const String orderStats = '/orders/stats/summary';
 
+  // ── Notifications ──
+  static const String myNotifications = '/orders/notifications/me';
+  static const String unreadNotificationsCount = '/orders/notifications/me/unread-count';
+  static const String readAllNotifications = '/orders/notifications/me/read-all';
+
   // ── Payments ──
   static const String payments = '/payments';
   static const String createPayment = '/payments/create';

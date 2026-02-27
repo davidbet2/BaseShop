@@ -28,6 +28,8 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   late final TabController _tabCtrl;
   final _searchCtrl = TextEditingController();
   bool _searchVisible = false;
+  int _page = 1;
+  static const _limit = 20;
 
   // ── Multi-select state ─────────────────────────────────────
   bool _selectMode = false;
@@ -59,6 +61,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
   void _refresh() {
     _bloc.add(LoadProducts(
       search: _searchCtrl.text.trim().isEmpty ? null : _searchCtrl.text.trim(),
+      page: _page,
     ));
   }
 
@@ -228,7 +231,13 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           if (state is ProductsLoading) return _shimmer();
           if (state is ProductsLoaded) {
             if (state.products.isEmpty) return _emptyProducts();
-            return _productsList(state);
+            final totalPages = (state.total / _limit).ceil().clamp(1, 999);
+            return Column(
+              children: [
+                Expanded(child: _productsList(state)),
+                if (totalPages > 1) _buildProductsPagination(totalPages),
+              ],
+            );
           }
           if (state is ProductsError) return _errorWidget(state.message);
           return const SizedBox.shrink();
@@ -237,6 +246,44 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildProductsPagination(int totalPages) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _page > 1
+                ? () {
+                    setState(() => _page--);
+                    _refresh();
+                  }
+                : null,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Página $_page de $totalPages',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _page < totalPages
+                ? () {
+                    setState(() => _page++);
+                    _refresh();
+                  }
+                : null,
+          ),
+        ],
+      ),
     );
   }
 

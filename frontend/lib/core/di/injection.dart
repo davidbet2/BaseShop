@@ -17,6 +17,9 @@ import 'package:baseshop/features/cart/bloc/cart_bloc.dart';
 import 'package:baseshop/features/orders/repository/orders_repository.dart';
 import 'package:baseshop/features/orders/bloc/orders_bloc.dart';
 
+import 'package:baseshop/features/notifications/repository/notifications_repository.dart';
+import 'package:baseshop/features/notifications/bloc/notifications_bloc.dart';
+
 import 'package:baseshop/features/payments/repository/payments_repository.dart';
 import 'package:baseshop/features/payments/bloc/payments_bloc.dart';
 
@@ -58,6 +61,10 @@ void configureDependencies() {
     () => OrdersRepository(getIt<ApiClient>()),
   );
 
+  getIt.registerLazySingleton<NotificationsRepository>(
+    () => NotificationsRepository(getIt<ApiClient>()),
+  );
+
   getIt.registerLazySingleton<PaymentsRepository>(
     () => PaymentsRepository(getIt<ApiClient>()),
   );
@@ -93,6 +100,11 @@ void configureDependencies() {
   // Factory: new instance per screen
   getIt.registerFactory<OrdersBloc>(
     () => OrdersBloc(getIt<OrdersRepository>()),
+  );
+
+  // Factory: new instance per screen
+  getIt.registerFactory<NotificationsBloc>(
+    () => NotificationsBloc(getIt<NotificationsRepository>()),
   );
 
   // Factory: new instance per payment flow

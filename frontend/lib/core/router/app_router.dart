@@ -32,11 +32,13 @@ import 'package:baseshop/features/admin/screens/admin_order_detail_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_store_config_screen.dart';
 import 'package:baseshop/features/admin/screens/admin_policies_screen.dart';
 import 'package:baseshop/features/policies/screens/policies_screen.dart';
+import 'package:baseshop/features/notifications/screens/notifications_screen.dart';
 import 'package:baseshop/features/home/screens/shell_screen.dart';
 
 // ── Auth-only paths (require login) ─────────────────────────
 const _authRequiredPaths = <String>{
   '/orders',
+  '/notifications',
   '/profile',
   '/checkout',
   '/payu-checkout',
@@ -183,6 +185,12 @@ late final GoRouter appRouter = GoRouter(
           path: '/orders',
           pageBuilder: (context, state) => const NoTransitionPage(
             child: OrdersScreen(),
+          ),
+        ),
+        GoRoute(
+          path: '/notifications',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: NotificationsScreen(),
           ),
         ),
         GoRoute(

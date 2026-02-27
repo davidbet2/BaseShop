@@ -24,6 +24,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   final _searchCtrl = TextEditingController();
   String? _selectedStatus;
   int _page = 1;
+  static const _limit = 20;
 
   // Stats
   Map<String, dynamic>? _stats;
@@ -339,11 +340,52 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
         if (state is OrdersLoading) return _shimmer();
         if (state is OrdersLoaded) {
           if (state.orders.isEmpty) return _empty();
-          return isWide ? _buildTable(state) : _buildMobileCards(state);
+          final totalPages = (state.total / _limit).ceil().clamp(1, 999);
+          return Column(
+            children: [
+              isWide ? _buildTable(state) : _buildMobileCards(state),
+              if (totalPages > 1) _buildPaginationBar(totalPages),
+            ],
+          );
         }
         if (state is OrdersError) return _error(state.message);
         return const SizedBox.shrink();
       },
+    );
+  }
+
+  Widget _buildPaginationBar(int totalPages) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            onPressed: _page > 1
+                ? () {
+                    setState(() => _page--);
+                    _loadOrders();
+                  }
+                : null,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Página $_page de $totalPages',
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            onPressed: _page < totalPages
+                ? () {
+                    setState(() => _page++);
+                    _loadOrders();
+                  }
+                : null,
+          ),
+        ],
+      ),
     );
   }
 

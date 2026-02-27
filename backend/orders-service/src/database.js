@@ -138,6 +138,19 @@ const initDatabase = async () => {
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
   )`);
 
+  // ── Tabla de notificaciones del usuario ──
+  rawDb.run(`CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    order_id TEXT,
+    order_number TEXT,
+    type TEXT DEFAULT 'order_status',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_read INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+
   // ── Índices ──
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_orders_user ON orders(user_id)');
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)');
@@ -145,6 +158,8 @@ const initDatabase = async () => {
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(created_at)');
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id)');
   rawDb.run('CREATE INDEX IF NOT EXISTS idx_order_status_history_order ON order_status_history(order_id)');
+  rawDb.run('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)');
+  rawDb.run('CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at)');
 
   save();
 

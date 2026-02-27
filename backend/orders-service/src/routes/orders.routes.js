@@ -230,8 +230,16 @@ router.get('/me', (req, res) => {
     const total = countResult ? countResult.total : 0;
     const orders = db.prepare(dataSql).all(...params, limit, offset);
 
+    // Enrich orders with items from order_items table
+    const enriched = orders.map(order => {
+      const items = db.prepare(
+        'SELECT product_id, product_name, product_price, product_image, quantity, subtotal FROM order_items WHERE order_id = ? ORDER BY created_at'
+      ).all(order.id);
+      return { ...order, items, items_count: items.length };
+    });
+
     res.json({
-      data: orders,
+      data: enriched,
       pagination: {
         page,
         limit,
@@ -464,6 +472,24 @@ router.patch('/:id/status', roleMiddleware('admin'), [
        VALUES (?, ?, ?, ?, ?)`
     ).run(uuidv4(), id, newStatus, note || '', changedBy);
 
+    // Crear notificación para el usuario
+    const statusLabels = {
+      'pending': 'Pendiente',
+      'confirmed': 'Confirmado',
+      'processing': 'En proceso',
+      'shipped': 'Enviado',
+      'delivered': 'Entregado',
+      'cancelled': 'Cancelado',
+      'refunded': 'Reembolsado',
+    };
+    const statusLabel = statusLabels[newStatus] || newStatus;
+    const notifTitle = `Pedido ${order.order_number} actualizado`;
+    const notifMessage = `Tu pedido #${order.order_number} cambió a estado: ${statusLabel}`;
+    db.prepare(
+      `INSERT INTO notifications (id, user_id, order_id, order_number, type, title, message)
+       VALUES (?, ?, ?, ?, 'order_status', ?, ?)`
+    ).run(uuidv4(), order.user_id, id, order.order_number, notifTitle, notifMessage);
+
     const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
     const statusHistory = db.prepare('SELECT * FROM order_status_history WHERE order_id = ? ORDER BY created_at').all(id);
 
@@ -474,6 +500,116 @@ router.patch('/:id/status', roleMiddleware('admin'), [
   } catch (error) {
     console.error('[orders-service] Error updating order status:', error);
     res.status(500).json({ error: 'Error al actualizar el estado del pedido' });
+  }
+});
+
+// ══════════════════════════════════════════════
+//  NOTIFICATION ROUTES
+// ══════════════════════════════════════════════
+
+// ──────────────────────────────────────────────
+// GET /api/orders/notifications/me — Mis notificaciones
+// ──────────────────────────────────────────────
+router.get('/notifications/me', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+
+    const countResult = db.prepare(
+      'SELECT COUNT(*) as total FROM notifications WHERE user_id = ?'
+    ).get(userId);
+    const total = countResult ? countResult.total : 0;
+
+    const unreadResult = db.prepare(
+      'SELECT COUNT(*) as unread FROM notifications WHERE user_id = ? AND is_read = 0'
+    ).get(userId);
+    const unread = unreadResult ? unreadResult.unread : 0;
+
+    const notifications = db.prepare(
+      'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
+    ).all(userId, limit, offset);
+
+    res.json({
+      data: notifications,
+      unread,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    console.error('[orders-service] Error listing notifications:', error);
+    res.status(500).json({ error: 'Error al listar notificaciones' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/orders/notifications/me/unread-count
+// ──────────────────────────────────────────────
+router.get('/notifications/me/unread-count', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const result = db.prepare(
+      'SELECT COUNT(*) as unread FROM notifications WHERE user_id = ? AND is_read = 0'
+    ).get(userId);
+    res.json({ unread: result ? result.unread : 0 });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al obtener conteo' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// PATCH /api/orders/notifications/me/read-all — Marcar todas como leídas
+// ──────────────────────────────────────────────
+router.patch('/notifications/me/read-all', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    db.prepare(
+      'UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0'
+    ).run(userId);
+    res.json({ message: 'Todas las notificaciones marcadas como leídas' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al actualizar notificaciones' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// DELETE /api/orders/notifications/me/:id — Eliminar una notificación
+// ──────────────────────────────────────────────
+router.delete('/notifications/me/:id', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const { id } = req.params;
+
+    const notif = db.prepare(
+      'SELECT * FROM notifications WHERE id = ? AND user_id = ?'
+    ).get(id, userId);
+
+    if (!notif) {
+      return res.status(404).json({ error: 'Notificación no encontrada' });
+    }
+
+    db.prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?').run(id, userId);
+    res.json({ message: 'Notificación eliminada' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar notificación' });
+  }
+});
+
+// ──────────────────────────────────────────────
+// DELETE /api/orders/notifications/me — Eliminar todas
+// ──────────────────────────────────────────────
+router.delete('/notifications/me', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    db.prepare('DELETE FROM notifications WHERE user_id = ?').run(userId);
+    res.json({ message: 'Todas las notificaciones eliminadas' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al eliminar notificaciones' });
   }
 });
 
