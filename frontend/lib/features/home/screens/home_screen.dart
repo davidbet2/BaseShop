@@ -205,6 +205,12 @@ class _HomeScreenState extends State<HomeScreen> {
               _headerNavLink('Perfil', Icons.person_outline_rounded, '/profile', primary)
             else
               _headerNavLink('Ingresar', Icons.login_rounded, '/login', primary),
+
+            // Notification bell — after profile
+            if (isAuthenticated && !isAdmin) ...[
+              const SizedBox(width: 6),
+              _notificationBell(primary),
+            ],
           ],
         ],
       ),
@@ -273,6 +279,30 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _notificationBell(Color primary) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final isActive = location.startsWith('/notifications');
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () => context.go('/notifications'),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? primary.withValues(alpha: 0.1) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isActive ? Icons.notifications_rounded : Icons.notifications_outlined,
+            color: isActive ? primary : AppTheme.textSecondary,
+            size: 22,
+          ),
         ),
       ),
     );

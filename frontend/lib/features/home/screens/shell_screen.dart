@@ -253,17 +253,17 @@ class _WebHeaderBar extends StatelessWidget {
             _navLink(context, 'Políticas', Icons.policy_outlined, '/policies', primary, location),
           ],
 
-          // Notification bell — at the end, right before profile
-          if (isAuthenticated && !isAdmin) ...[
-            const SizedBox(width: 6),
-            _notificationBell(context, primary, location),
-          ],
-
           const SizedBox(width: 6),
           if (isAuthenticated)
             _navLink(context, 'Perfil', Icons.person_outline_rounded, '/profile', primary, location)
           else
             _navLink(context, 'Ingresar', Icons.login_rounded, '/login', primary, location),
+
+          // Notification bell — after profile
+          if (isAuthenticated && !isAdmin) ...[
+            const SizedBox(width: 6),
+            _notificationBell(context, primary, location),
+          ],
         ],
       ),
     );

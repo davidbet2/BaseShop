@@ -125,7 +125,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // General section
                   _buildSection('General', [
-                    _buildMenuItem(Icons.help_outline_rounded, 'Ayuda y soporte', () => _showHelpSupportDialog()),
+                    if (role != 'admin')
+                      _buildMenuItem(Icons.help_outline_rounded, 'Ayuda y soporte', () => _showHelpSupportDialog()),
                     _buildMenuItem(Icons.info_outline_rounded, 'Acerca de', () => _showAboutDialog()),
                   ]),
 

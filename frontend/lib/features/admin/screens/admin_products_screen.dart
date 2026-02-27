@@ -335,53 +335,134 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     final isWide = MediaQuery.of(context).size.width > 800;
 
     if (isWide) {
-      // ── Web: Responsive card grid ──
-      final screenWidth = MediaQuery.of(context).size.width;
-      final crossAxisCount = screenWidth > 1400 ? 5 : screenWidth > 1100 ? 4 : 3;
+      // ── Web: Full-width DataTable ──
+      final primary = Theme.of(context).colorScheme.primary;
+      final allSelected = state.products.isNotEmpty &&
+          state.products.every((p) => _selectedProductIds.contains(_id(p)));
 
       return Padding(
         padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            // Select-all bar for web
-            if (_selectMode)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  children: [
-                    Checkbox(
-                      value: state.products.isNotEmpty &&
-                          state.products.every((p) => _selectedProductIds.contains(_id(p))),
-                      onChanged: (v) {
-                        setState(() {
-                          if (v == true) {
-                            _selectedProductIds.addAll(state.products.map(_id));
-                          } else {
-                            _selectedProductIds.clear();
-                          }
-                        });
-                      },
-                    ),
-                    Text(
-                      'Seleccionar todos (${state.products.length})',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-              ),
-            Expanded(
-              child: GridView.builder(
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 0.72,
-                ),
-                itemCount: state.products.length,
-                itemBuilder: (_, i) => _webProductCard(state.products[i]),
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey.shade200),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: SingleChildScrollView(
+            child: SizedBox(
+              width: double.infinity,
+              child: DataTable(
+                columnSpacing: 24,
+                horizontalMargin: 20,
+                headingRowHeight: 52,
+                dataRowMinHeight: 60,
+                dataRowMaxHeight: 68,
+                headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
+                showCheckboxColumn: _selectMode,
+                columns: [
+                  const DataColumn(label: Text('Imagen', style: TextStyle(fontWeight: FontWeight.w700))),
+                  const DataColumn(label: Text('Nombre', style: TextStyle(fontWeight: FontWeight.w700))),
+                  const DataColumn(label: Text('Precio', style: TextStyle(fontWeight: FontWeight.w700)), numeric: true),
+                  const DataColumn(label: Text('Stock', style: TextStyle(fontWeight: FontWeight.w700)), numeric: true),
+                  const DataColumn(label: Text('Destacado', style: TextStyle(fontWeight: FontWeight.w700))),
+                  const DataColumn(label: Text('Acciones', style: TextStyle(fontWeight: FontWeight.w700))),
+                ],
+                rows: state.products.map((product) {
+                  final pid = _id(product);
+                  final name = product['name'] as String? ?? 'Sin nombre';
+                  final price = (product['price'] as num?)?.toDouble() ?? 0;
+                  final stock = product['stock'] as int? ?? 0;
+                  final isFeatured = product['is_featured'] == true || product['is_featured'] == 1;
+                  final img = _extractFirstImage(product);
+
+                  return DataRow(
+                    selected: _selectedProductIds.contains(pid),
+                    onSelectChanged: _selectMode
+                        ? (_) => _toggleProductSelection(pid)
+                        : null,
+                    cells: [
+                      // Image
+                      DataCell(
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: img.isNotEmpty
+                              ? CachedNetworkImage(
+                                  imageUrl: img,
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => _imgPlaceholder(48),
+                                )
+                              : _imgPlaceholder(48),
+                        ),
+                      ),
+                      // Name
+                      DataCell(
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 260),
+                          child: Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        onTap: () => _showProductForm(context, product: product),
+                      ),
+                      // Price
+                      DataCell(Text(
+                        _currencyFmt.format(price),
+                        style: TextStyle(fontWeight: FontWeight.w600, color: primary),
+                      )),
+                      // Stock
+                      DataCell(_badge(
+                        stock > 0 ? '$stock' : 'Agotado',
+                        stock > 0 ? AppTheme.successColor : AppTheme.errorColor,
+                      )),
+                      // Featured toggle
+                      DataCell(
+                        IconButton(
+                          icon: Icon(
+                            isFeatured ? Icons.star_rounded : Icons.star_border_rounded,
+                            color: isFeatured ? Colors.amber : Colors.grey,
+                          ),
+                          onPressed: () => _bloc.add(ToggleFeatured(
+                            productId: (product['_id'] ?? product['id'] ?? '').toString(),
+                          )),
+                          tooltip: isFeatured ? 'Quitar destacado' : 'Destacar',
+                        ),
+                      ),
+                      // Actions
+                      DataCell(Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            tooltip: 'Editar',
+                            onPressed: () => _showProductForm(context, product: product),
+                            splashRadius: 20,
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.inventory_outlined, size: 20),
+                            tooltip: 'Stock',
+                            onPressed: () => _showStockDialog(product),
+                            splashRadius: 20,
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete_outline, size: 20, color: AppTheme.errorColor),
+                            tooltip: 'Eliminar',
+                            onPressed: () => _confirmAndDelete(product),
+                            splashRadius: 20,
+                          ),
+                        ],
+                      )),
+                    ],
+                  );
+                }).toList(),
               ),
             ),
-          ],
+          ),
         ),
       );
     }
