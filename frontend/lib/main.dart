@@ -99,17 +99,23 @@ class MyApp extends StatelessWidget {
       child: BlocBuilder<StoreConfigCubit, StoreConfigState>(
         bloc: getIt<StoreConfigCubit>(),
         builder: (context, configState) {
-          final primaryColor = configState is StoreConfigLoaded
-              ? configState.config.primaryColor
-              : AppTheme.defaultPrimary;
+          // While config is loading, show a white splash to avoid any color flash
+          if (configState is! StoreConfigLoaded) {
+            return const MaterialApp(
+              debugShowCheckedModeBanner: false,
+              home: Scaffold(
+                backgroundColor: Colors.white,
+                body: Center(
+                  child: CircularProgressIndicator(color: Color(0xFFC2185B)),
+                ),
+              ),
+            );
+          }
+          final primaryColor = configState.config.primaryColor;
 
           // Dynamic favicon + tab title on web
-          final storeName = configState is StoreConfigLoaded
-              ? configState.config.storeName
-              : _cachedStoreName;
-          final storeLogo = configState is StoreConfigLoaded
-              ? configState.config.storeLogo
-              : _cachedStoreLogo;
+          final storeName = configState.config.storeName;
+          final storeLogo = configState.config.storeLogo;
           if (kIsWeb) {
             updateWebFavicon(storeLogo);
             updateWebTitle(storeName);

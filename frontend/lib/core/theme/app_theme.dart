@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // ── Default warm orange palette (inspired by modern e-commerce UIs) ──
-  static const Color defaultPrimary = Color(0xFFF97316);  // Orange-500
+  // ── Default palette (matches store config); overridden by StoreConfigCubit ──
+  static const Color defaultPrimary = Color(0xFFC2185B);  // Pink-700
 
   // ── Kept for backward-compat: use Theme.of(context).colorScheme.primary when possible ──
   static const Color primaryColor = defaultPrimary;
-  static const Color primaryLight = Color(0xFFFDBA74);   // Orange-300
-  static const Color primaryDark = Color(0xFFEA580C);    // Orange-600
-  static const Color accentColor = Color(0xFFF97316);
+  static const Color primaryLight = Color(0xFFF06292);   // Pink-300
+  static const Color primaryDark = Color(0xFF880E4F);    // Pink-900
+  static const Color accentColor = Color(0xFFC2185B);
   static const Color backgroundColor = Color(0xFFFAFAFA);
   static const Color surfaceColor = Colors.white;
   static const Color errorColor = Color(0xFFEF4444);

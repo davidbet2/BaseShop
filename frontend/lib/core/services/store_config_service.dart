@@ -25,7 +25,7 @@ class StoreConfigService {
         featuredTitle: 'Colección destacada',
         featuredDesc: 'Los productos más elegidos por nuestros clientes',
         banners: [],
-        primaryColorHex: 'F97316',
+        primaryColorHex: 'C2185B',
         policiesContent: '',
       );
     }
@@ -81,7 +81,7 @@ class StoreConfig {
     required this.featuredTitle,
     required this.featuredDesc,
     required this.banners,
-    this.primaryColorHex = 'F97316',
+    this.primaryColorHex = 'C2185B',
     this.policiesContent = '',
   });
 
@@ -94,7 +94,7 @@ class StoreConfig {
       storeLogo: json['store_logo']?.toString() ?? '',
       featuredTitle: json['featured_title']?.toString() ?? 'Colección destacada',
       featuredDesc: json['featured_desc']?.toString() ?? 'Los productos más elegidos por nuestros clientes',
-      primaryColorHex: json['primary_color_hex']?.toString() ?? 'F97316',      policiesContent: json['policies_content']?.toString() ?? '',      banners: bannersRaw.map((b) => BannerConfig.fromJson(b as Map<String, dynamic>)).toList(),
+      primaryColorHex: json['primary_color_hex']?.toString() ?? 'C2185B',      policiesContent: json['policies_content']?.toString() ?? '',      banners: bannersRaw.map((b) => BannerConfig.fromJson(b as Map<String, dynamic>)).toList(),
     );
   }
 

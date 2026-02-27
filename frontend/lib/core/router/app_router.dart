@@ -40,7 +40,8 @@ const _authRequiredPaths = <String>{
   '/profile',
   '/checkout',
   '/payu-checkout',
-  '/payment-result',
+  // '/payment-result' — intentionally NOT auth-required so PayU redirects work
+  // even when the token hasn't been restored from storage yet (full page reload).
   '/addresses',
   '/admin/dashboard',
   '/admin/products',
