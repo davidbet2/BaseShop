@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:get_it/get_it.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:baseshop/core/theme/app_theme.dart';
+import 'package:baseshop/core/di/injection.dart';
+import 'package:baseshop/core/services/store_config_service.dart';
+import 'package:baseshop/core/cubits/store_config_cubit.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_event.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
@@ -121,7 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   // General section
                   _buildSection('General', [
-                    _buildMenuItem(Icons.help_outline_rounded, 'Ayuda y soporte', () {}),
+                    _buildMenuItem(Icons.help_outline_rounded, 'Ayuda y soporte', () => _showHelpSupportDialog()),
                     _buildMenuItem(Icons.info_outline_rounded, 'Acerca de', () => _showAboutDialog()),
                   ]),
 
@@ -341,7 +345,141 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _showHelpSupportDialog() {
+    final configState = getIt<StoreConfigCubit>().state;
+    final config = configState is StoreConfigLoaded ? configState.config : null;
+    final email = config?.supportEmail ?? '';
+    final phone = config?.supportPhone ?? '';
+    final whatsapp = config?.supportWhatsapp ?? '';
+    final schedule = config?.supportSchedule ?? '';
+    final storeName = config?.storeName ?? 'BaseShop';
+    final primary = config?.primaryColor ?? Theme.of(context).colorScheme.primary;
+
+    final hasAnyData = email.isNotEmpty || phone.isNotEmpty || whatsapp.isNotEmpty || schedule.isNotEmpty;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                color: primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.support_agent_rounded, size: 22, color: primary),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text('Ayuda y Soporte', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
+            ),
+          ],
+        ),
+        content: hasAnyData
+            ? SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (email.isNotEmpty)
+                      _supportTile(
+                        icon: Icons.email_outlined,
+                        title: 'Correo electrónico',
+                        subtitle: email,
+                        color: primary,
+                        onTap: () => launchUrl(Uri.parse('mailto:$email')),
+                      ),
+                    if (phone.isNotEmpty)
+                      _supportTile(
+                        icon: Icons.phone_outlined,
+                        title: 'Teléfono',
+                        subtitle: phone,
+                        color: primary,
+                        onTap: () => launchUrl(Uri.parse('tel:$phone')),
+                      ),
+                    if (whatsapp.isNotEmpty)
+                      _supportTile(
+                        icon: Icons.chat_outlined,
+                        title: 'WhatsApp',
+                        subtitle: whatsapp,
+                        color: const Color(0xFF25D366),
+                        onTap: () {
+                          final cleanNumber = whatsapp.replaceAll(RegExp(r'[^0-9]'), '');
+                          launchUrl(Uri.parse('https://wa.me/$cleanNumber'));
+                        },
+                      ),
+                    if (schedule.isNotEmpty) ...[
+                      const Divider(height: 24),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.schedule_outlined, size: 20, color: primary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Horario de atención', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+                                const SizedBox(height: 4),
+                                Text(schedule, style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline_rounded, size: 48, color: Colors.grey.shade400),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Aún no hay información de soporte configurada para $storeName.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cerrar')),
+        ],
+      ),
+    );
+  }
+
+  Widget _supportTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        width: 40, height: 40,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, size: 20, color: color),
+      ),
+      title: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textSecondary)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textPrimary)),
+      trailing: onTap != null ? Icon(Icons.open_in_new_rounded, size: 18, color: color) : null,
+      onTap: onTap,
+    );
+  }
+
   void _showAboutDialog() {
+    final configState = getIt<StoreConfigCubit>().state;
+    final config = configState is StoreConfigLoaded ? configState.config : null;
+    final storeName = config?.storeName ?? 'BaseShop';
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -357,7 +495,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Icon(Icons.shopping_bag_rounded, size: 22, color: Theme.of(context).colorScheme.primary),
             ),
             const SizedBox(width: 12),
-            const Text('BaseShop', style: TextStyle(fontWeight: FontWeight.w700)),
+            Text(storeName, style: const TextStyle(fontWeight: FontWeight.w700)),
           ],
         ),
         content: Column(

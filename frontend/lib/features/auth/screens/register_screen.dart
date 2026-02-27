@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:baseshop/core/theme/app_theme.dart';
+import 'package:baseshop/core/di/injection.dart';
+import 'package:baseshop/core/services/store_config_service.dart';
+import 'package:baseshop/core/cubits/store_config_cubit.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_event.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
@@ -84,6 +87,51 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+
+                    // Store logo & name
+                    Center(
+                      child: Builder(
+                        builder: (context) {
+                          final configState = getIt<StoreConfigCubit>().state;
+                          final config = configState is StoreConfigLoaded ? configState.config : null;
+                          final logoUrl = config?.storeLogo ?? '';
+                          final storeName = config?.storeName ?? 'BaseShop';
+                          final primary = config?.primaryColor ?? Theme.of(context).colorScheme.primary;
+
+                          return Column(
+                            children: [
+                              if (logoUrl.isNotEmpty)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: Image.network(
+                                    logoUrl, width: 56, height: 56, fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      width: 56, height: 56,
+                                      decoration: BoxDecoration(color: primary, borderRadius: BorderRadius.circular(18)),
+                                      child: const Icon(Icons.shopping_bag_rounded, size: 28, color: Colors.white),
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  width: 56, height: 56,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [primary, primary.withValues(alpha: 0.7)],
+                                      begin: Alignment.topLeft, end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: const Icon(Icons.shopping_bag_rounded, size: 28, color: Colors.white),
+                                ),
+                              const SizedBox(height: 12),
+                              Text(storeName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.textSecondary)),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
                     // Header
                     const Text('Crear cuenta', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),

@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:baseshop/core/theme/app_theme.dart';
+import 'package:baseshop/core/di/injection.dart';
+import 'package:baseshop/core/services/store_config_service.dart';
+import 'package:baseshop/core/cubits/store_config_cubit.dart';
 import 'package:baseshop/features/auth/bloc/auth_bloc.dart';
 import 'package:baseshop/features/auth/bloc/auth_event.dart';
 import 'package:baseshop/features/auth/bloc/auth_state.dart';
@@ -74,20 +77,35 @@ class _LoginScreenState extends State<LoginScreen> {
                           const Spacer(flex: 2),
 
                           // Logo
-                          Container(
-                            width: 72, height: 72,
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFF97316), Color(0xFFFB923C)],
-                                begin: Alignment.topLeft, end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(22),
-                            boxShadow: [BoxShadow(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
-                            ),
-                            child: const Icon(Icons.shopping_bag_rounded, size: 34, color: Colors.white),
+                          Builder(
+                            builder: (context) {
+                              final configState = getIt<StoreConfigCubit>().state;
+                              final config = configState is StoreConfigLoaded ? configState.config : null;
+                              final logoUrl = config?.storeLogo ?? '';
+                              final primary = config?.primaryColor ?? Theme.of(context).colorScheme.primary;
+
+                              if (logoUrl.isNotEmpty) {
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(22),
+                                  child: Image.network(
+                                    logoUrl, width: 72, height: 72, fit: BoxFit.contain,
+                                    errorBuilder: (_, __, ___) => _defaultLogo(primary),
+                                  ),
+                                );
+                              }
+                              return _defaultLogo(primary);
+                            },
                           ),
                           const SizedBox(height: 24),
-                          const Text('BaseShop', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+                          Builder(
+                            builder: (context) {
+                              final configState = getIt<StoreConfigCubit>().state;
+                              final storeName = configState is StoreConfigLoaded
+                                  ? configState.config.storeName
+                                  : 'BaseShop';
+                              return Text(storeName, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.textPrimary));
+                            },
+                          ),
                           const SizedBox(height: 6),
                           const Text('Inicia sesi\u00f3n para continuar', style: TextStyle(fontSize: 15, color: AppTheme.textSecondary)),
 
@@ -202,6 +220,21 @@ class _LoginScreenState extends State<LoginScreen> {
         decoration: BoxDecoration(color: const Color(0xFFF3F4F6), borderRadius: BorderRadius.circular(14)),
         child: Icon(icon, size: 20, color: AppTheme.textPrimary),
       ),
+    );
+  }
+
+  Widget _defaultLogo(Color primary) {
+    return Container(
+      width: 72, height: 72,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [primary, primary.withValues(alpha: 0.7)],
+          begin: Alignment.topLeft, end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [BoxShadow(color: primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: const Icon(Icons.shopping_bag_rounded, size: 34, color: Colors.white),
     );
   }
 

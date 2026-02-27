@@ -41,6 +41,10 @@ class StoreConfigService {
     String? featuredDesc,
     String? primaryColorHex,
     String? policiesContent,
+    String? supportEmail,
+    String? supportPhone,
+    String? supportWhatsapp,
+    String? supportSchedule,
     List<BannerConfig>? banners,
   }) async {
     final body = <String, dynamic>{};
@@ -52,6 +56,10 @@ class StoreConfigService {
     if (featuredDesc != null) body['featured_desc'] = featuredDesc;
     if (primaryColorHex != null) body['primary_color_hex'] = primaryColorHex;
     if (policiesContent != null) body['policies_content'] = policiesContent;
+    if (supportEmail != null) body['support_email'] = supportEmail;
+    if (supportPhone != null) body['support_phone'] = supportPhone;
+    if (supportWhatsapp != null) body['support_whatsapp'] = supportWhatsapp;
+    if (supportSchedule != null) body['support_schedule'] = supportSchedule;
     if (banners != null) {
       body['banners'] = banners.map((b) => b.toJson()).toList();
     }
@@ -72,6 +80,10 @@ class StoreConfig {
   final List<BannerConfig> banners;
   final String primaryColorHex;
   final String policiesContent;
+  final String supportEmail;
+  final String supportPhone;
+  final String supportWhatsapp;
+  final String supportSchedule;
 
   const StoreConfig({
     required this.showHeader,
@@ -83,6 +95,10 @@ class StoreConfig {
     required this.banners,
     this.primaryColorHex = 'C2185B',
     this.policiesContent = '',
+    this.supportEmail = '',
+    this.supportPhone = '',
+    this.supportWhatsapp = '',
+    this.supportSchedule = '',
   });
 
   factory StoreConfig.fromJson(Map<String, dynamic> json) {
@@ -94,7 +110,13 @@ class StoreConfig {
       storeLogo: json['store_logo']?.toString() ?? '',
       featuredTitle: json['featured_title']?.toString() ?? 'Colección destacada',
       featuredDesc: json['featured_desc']?.toString() ?? 'Los productos más elegidos por nuestros clientes',
-      primaryColorHex: json['primary_color_hex']?.toString() ?? 'C2185B',      policiesContent: json['policies_content']?.toString() ?? '',      banners: bannersRaw.map((b) => BannerConfig.fromJson(b as Map<String, dynamic>)).toList(),
+      primaryColorHex: json['primary_color_hex']?.toString() ?? 'C2185B',
+      policiesContent: json['policies_content']?.toString() ?? '',
+      supportEmail: json['support_email']?.toString() ?? '',
+      supportPhone: json['support_phone']?.toString() ?? '',
+      supportWhatsapp: json['support_whatsapp']?.toString() ?? '',
+      supportSchedule: json['support_schedule']?.toString() ?? '',
+      banners: bannersRaw.map((b) => BannerConfig.fromJson(b as Map<String, dynamic>)).toList(),
     );
   }
 

@@ -35,6 +35,10 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
   final _featuredTitleCtrl = TextEditingController();
   final _featuredDescCtrl = TextEditingController();
   final _storeNameCtrl = TextEditingController();
+  final _supportEmailCtrl = TextEditingController();
+  final _supportPhoneCtrl = TextEditingController();
+  final _supportWhatsappCtrl = TextEditingController();
+  final _supportScheduleCtrl = TextEditingController();
   String _logoPath = '';
   bool _showHeader = true;
   bool _showFooter = true;
@@ -55,6 +59,10 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
     _featuredTitleCtrl.dispose();
     _featuredDescCtrl.dispose();
     _storeNameCtrl.dispose();
+    _supportEmailCtrl.dispose();
+    _supportPhoneCtrl.dispose();
+    _supportWhatsappCtrl.dispose();
+    _supportScheduleCtrl.dispose();
     _productsBloc.close();
     super.dispose();
   }
@@ -86,6 +94,10 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
       _showFooter = c.showFooter;
       _banners = List<BannerConfig>.from(c.banners);
       _primaryColorHex = c.primaryColorHex;
+      _supportEmailCtrl.text = c.supportEmail;
+      _supportPhoneCtrl.text = c.supportPhone;
+      _supportWhatsappCtrl.text = c.supportWhatsapp;
+      _supportScheduleCtrl.text = c.supportSchedule;
       _loading = false;
     });
   }
@@ -99,6 +111,10 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
       showHeader: _showHeader,
       showFooter: _showFooter,
       primaryColorHex: _primaryColorHex,
+      supportEmail: _supportEmailCtrl.text.trim(),
+      supportPhone: _supportPhoneCtrl.text.trim(),
+      supportWhatsapp: _supportWhatsappCtrl.text.trim(),
+      supportSchedule: _supportScheduleCtrl.text.trim(),
       banners: _banners,
     );
 
@@ -183,6 +199,8 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                               _buildStoreIdentityCard(),
                               const SizedBox(height: 16),
                               _buildPrimaryColorCard(),
+                              const SizedBox(height: 16),
+                              _buildSupportCard(),
                             ]),
                           ),
                           const SizedBox(width: 20),
@@ -203,6 +221,8 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                         _buildHomeSectionCard(),
                         const SizedBox(height: 16),
                         _buildBannersCard(),
+                        const SizedBox(height: 16),
+                        _buildSupportCard(),
                         const SizedBox(height: 80),
                       ]),
               ),
@@ -866,6 +886,27 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
   }
 
   // ── Helpers ────────────────────────────────────────────────
+
+  Widget _buildSupportCard() {
+    return _card(
+      title: 'Ayuda y Soporte',
+      icon: Icons.support_agent_outlined,
+      children: [
+        _field(_supportEmailCtrl, 'Correo de soporte', Icons.email_outlined),
+        const SizedBox(height: 12),
+        _field(_supportPhoneCtrl, 'Teléfono de contacto', Icons.phone_outlined),
+        const SizedBox(height: 12),
+        _field(_supportWhatsappCtrl, 'WhatsApp (con código de país)', Icons.chat_outlined),
+        const SizedBox(height: 12),
+        _field(_supportScheduleCtrl, 'Horario de atención', Icons.schedule_outlined, maxLines: 2),
+        const SizedBox(height: 8),
+        Text(
+          'Esta información se mostrará a los clientes en la sección de Ayuda y Soporte.',
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+        ),
+      ],
+    );
+  }
 
   Widget _field(
     TextEditingController ctrl,

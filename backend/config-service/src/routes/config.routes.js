@@ -37,6 +37,10 @@ function readFullConfig(db) {
     featured_desc: config.featured_desc || 'Los productos más elegidos por nuestros clientes',
     primary_color_hex: config.primary_color_hex || 'F97316',
     policies_content: config.policies_content || '',
+    support_email: config.support_email || '',
+    support_phone: config.support_phone || '',
+    support_whatsapp: config.support_whatsapp || '',
+    support_schedule: config.support_schedule || '',
     banners: banners.map(b => ({
       id: b.id,
       image_path: b.image_path,
@@ -77,6 +81,10 @@ configRouter.put(
     body('featured_desc').optional().isString().isLength({ max: 500 }),
     body('primary_color_hex').optional().isString().matches(/^[0-9A-Fa-f]{6}$/),
     body('policies_content').optional().isString().isLength({ max: 50000 }),
+    body('support_email').optional().isString().isLength({ max: 200 }),
+    body('support_phone').optional().isString().isLength({ max: 50 }),
+    body('support_whatsapp').optional().isString().isLength({ max: 50 }),
+    body('support_schedule').optional().isString().isLength({ max: 500 }),
     body('banners').optional().isArray(),
     body('banners.*.image_path').optional({ nullable: true }).isString(),
     body('banners.*.product_id').optional({ nullable: true }).isString(),
@@ -98,6 +106,10 @@ configRouter.put(
         featured_desc,
         primary_color_hex,
         policies_content,
+        support_email,
+        support_phone,
+        support_whatsapp,
+        support_schedule,
         banners,
       } = req.body;
 
@@ -116,6 +128,10 @@ configRouter.put(
       if (featured_desc !== undefined) upsert.run('featured_desc', featured_desc);
       if (primary_color_hex !== undefined) upsert.run('primary_color_hex', primary_color_hex.toUpperCase());
       if (policies_content !== undefined) upsert.run('policies_content', policies_content);
+      if (support_email !== undefined) upsert.run('support_email', support_email);
+      if (support_phone !== undefined) upsert.run('support_phone', support_phone);
+      if (support_whatsapp !== undefined) upsert.run('support_whatsapp', support_whatsapp);
+      if (support_schedule !== undefined) upsert.run('support_schedule', support_schedule);
 
       // Replace banners if provided
       if (banners !== undefined) {
