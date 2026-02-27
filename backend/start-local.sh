@@ -3,8 +3,8 @@
 # BaseShop - Start all services locally
 # ============================================
 
-export JWT_SECRET="baseshop-dev-secret-change-in-production"
-export ALLOWED_ORIGINS="http://localhost:9090,http://localhost:8080,http://localhost:3000"
+export JWT_SECRET="${JWT_SECRET:-baseshop-dev-secret-change-in-production}"
+export ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-http://localhost:9090,http://localhost:8080,http://localhost:3000}"
 
 BACKEND_DIR="$(cd "$(dirname "$0")" && pwd)"
 PIDS=()
@@ -29,17 +29,17 @@ start_service() {
 
   # Extra env for specific services
   if [ "$name" = "auth-service" ]; then
-    export ADMIN_EMAIL="admin@baseshop.com"
-    export ADMIN_PASSWORD="Admin123!"
-    export JWT_EXPIRATION="24h"
+    export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@baseshop.com}"
+    export ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin123!}"
+    export JWT_EXPIRATION="${JWT_EXPIRATION:-24h}"
   fi
 
   if [ "$name" = "payments-service" ]; then
-    export PAYU_IS_TEST="true"
-    export PAYU_API_KEY="4Vj8eK4rloUd272L48hsrarnUA"
-    export PAYU_API_LOGIN="pRRXKOl8ikMmt9u"
-    export PAYU_MERCHANT_ID="508029"
-    export PAYU_ACCOUNT_ID="512321"
+    export PAYU_IS_TEST="${PAYU_IS_TEST:-true}"
+    export PAYU_API_KEY="${PAYU_API_KEY:-4Vj8eK4rloUd272L48hsrarnUA}"
+    export PAYU_API_LOGIN="${PAYU_API_LOGIN:-pRRXKOl8ikMmt9u}"
+    export PAYU_MERCHANT_ID="${PAYU_MERCHANT_ID:-508029}"
+    export PAYU_ACCOUNT_ID="${PAYU_ACCOUNT_ID:-512321}"
     export ORDERS_SERVICE_URL="http://localhost:3005"
     export FRONTEND_URL="http://localhost:8080"
     export GATEWAY_URL="http://localhost:3000"

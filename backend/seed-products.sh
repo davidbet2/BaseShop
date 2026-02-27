@@ -13,9 +13,11 @@ echo "════════════════════════�
 
 # 1. Login as admin to get token
 echo "[1/3] Logging in as admin..."
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@baseshop.com}"
+ADMIN_PASS="${ADMIN_PASSWORD:-Admin123!}"
 TOKEN=$(curl -s -X POST "$API/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"admin@baseshop.com","password":"Admin123!"}' \
+  -d "{\"email\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASS\"}" \
   | grep -o '"token":"[^"]*"' | head -1 | cut -d'"' -f4)
 
 if [ -z "$TOKEN" ]; then

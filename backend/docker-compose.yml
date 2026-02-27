@@ -36,10 +36,10 @@ services:
       - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
       - JWT_EXPIRATION=24h
       - DB_PATH=/app/data/auth.db
-      - ADMIN_EMAIL=admin@baseshop.com
-      - ADMIN_PASSWORD=Admin123!
-      - ALLOWED_ORIGINS=http://localhost:9090,http://localhost:8080,http://localhost:3000
-      - RECAPTCHA_SECRET_KEY=6Lfu5ncsAAAAAOePV4puBN9QaHlpREPmjxzqpDld
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@baseshop.com}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:9090,http://localhost:8080,http://localhost:3000}
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:?Set RECAPTCHA_SECRET_KEY in .env}
     volumes: [auth-data:/app/data]
     networks: [baseshop-network]
     restart: unless-stopped
@@ -95,10 +95,10 @@ services:
       - PORT=3006
       - JWT_SECRET=${JWT_SECRET:-baseshop-dev-secret-change-in-production}
       - DB_PATH=/app/data/payments.db
-      - PAYU_API_KEY=${PAYU_API_KEY:-4Vj8eK4rloUd272L48hsrarnUA}
-      - PAYU_API_LOGIN=${PAYU_API_LOGIN:-pRRXKOl8ikMmt9u}
-      - PAYU_MERCHANT_ID=${PAYU_MERCHANT_ID:-508029}
-      - PAYU_ACCOUNT_ID=${PAYU_ACCOUNT_ID:-512321}
+      - PAYU_API_KEY=${PAYU_API_KEY:?Set PAYU_API_KEY in .env}
+      - PAYU_API_LOGIN=${PAYU_API_LOGIN:?Set PAYU_API_LOGIN in .env}
+      - PAYU_MERCHANT_ID=${PAYU_MERCHANT_ID:?Set PAYU_MERCHANT_ID in .env}
+      - PAYU_ACCOUNT_ID=${PAYU_ACCOUNT_ID:?Set PAYU_ACCOUNT_ID in .env}
       - PAYU_IS_TEST=true
       - ORDERS_SERVICE_URL=http://orders-service:3005
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:8080}

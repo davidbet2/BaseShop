@@ -4,13 +4,23 @@ node_modules/
 .pnp.js
 
 # Database files
-data/*.db
 *.db
+*.db-journal
+*.db-wal
+*.db.bak
+**/data/*.db
+**/data/*.db-journal
+**/data/*.db-wal
+**/data/*.db.bak
+
+# User-uploaded files
+**/data/uploads/
 
 # Environment
 .env
 .env.local
 .env.*.local
+.env.production
 
 # Logs
 *.log
@@ -19,16 +29,19 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*.sublime-*
 
 # Build
 build/
 dist/
+*.tgz
 
 # Flutter
 frontend/.dart_tool/
@@ -49,6 +62,15 @@ frontend/ios/Flutter/Flutter.podspec
 
 # Docker
 docker-compose.override.yml
+
+# Backups / temp
+*.bak
+*.tmp
+*.orig
+
+# Coverage
+coverage/
+.nyc_output/
 
 # Agent Skills
 .github/skills/
