@@ -143,11 +143,15 @@ test.describe.serial('Compra completa — Login → Producto → Checkout → Pa
     }
     await snap('home-page');
 
-    // Get first product from API
+    // Get first REAL product from API (skip E2E test products)
     const resp = await page.request.get(`${API}/products`);
     const body = await resp.json();
     const products = body.products || body.data || body;
-    const prod = Array.isArray(products) ? products[0] : null;
+    const allProds = Array.isArray(products) ? products : [];
+    // Filter out test/E2E products — pick the first one with a real name and images
+    const prod = allProds.find(p =>
+      p.name !== 'E2E Product' && p.images?.length > 0
+    ) || allProds.find(p => p.name !== 'E2E Product') || allProds[0];
     expect(prod).toBeTruthy();
     productId = prod.id || prod._id;
 
@@ -483,15 +487,46 @@ test.describe.serial('Compra completa — Login → Producto → Checkout → Pa
       } catch (e) { console.log(`  ⚠ Installments: ${e.message?.substring(0, 60)}`); }
     }
 
-    // Terms and conditions checkbox: #tandc
+    // Terms and conditions checkbox: #tandc (CRITICAL — PayU blocks payment without this)
     const tandc = page.locator('#tandc').first();
-    if (await tandc.isVisible({ timeout: 2000 }).catch(() => false)) {
+    if (await tandc.isVisible({ timeout: 3000 }).catch(() => false)) {
+      // Use multiple strategies to ensure the checkbox is actually checked
       try {
-        await tandc.evaluate(el => el.click());
-        console.log('  ✓ T&C checked via evaluate');
-      } catch (e) { console.log(`  ⚠ T&C: ${e.message?.substring(0, 60)}`); }
+        // Strategy 1: Playwright .check() (handles label clicks)
+        await tandc.check({ timeout: 3000 });
+        console.log('  ✓ T&C checked via .check()');
+      } catch {
+        try {
+          // Strategy 2: Click the label text instead
+          const label = page.locator('text=Acepto los términos').first();
+          if (await label.isVisible({ timeout: 2000 }).catch(() => false)) {
+            await label.click();
+            console.log('  ✓ T&C checked via label click');
+          }
+        } catch {
+          // Strategy 3: Force via JS with full Angular event dispatch
+          await tandc.evaluate(el => {
+            el.checked = true;
+            el.dispatchEvent(new Event('click', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          });
+          console.log('  ✓ T&C checked via JS force');
+        }
+      }
+      // Verify it's actually checked
+      const isChecked = await tandc.evaluate(el => el.checked);
+      console.log(`  → T&C checked state: ${isChecked}`);
+      if (!isChecked) {
+        // Last resort: direct click on the element
+        await tandc.click({ force: true });
+        console.log('  ✓ T&C force-clicked');
+      }
+    } else {
+      console.log('  ⚠ T&C checkbox not visible');
     }
 
+    await page.waitForTimeout(1000);
     await snap('payu-card-filled');
 
     // ── Click Pay ──
