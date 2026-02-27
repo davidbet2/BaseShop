@@ -335,127 +335,53 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     final isWide = MediaQuery.of(context).size.width > 800;
 
     if (isWide) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: BorderSide(color: Colors.grey.shade200),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: DataTable(
-              headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
-              columnSpacing: 16,
-              columns: [
-                if (_selectMode)
-                  DataColumn(label: Checkbox(
-                    value: state.products.isNotEmpty &&
-                        state.products.every((p) => _selectedProductIds.contains(_id(p))),
-                    onChanged: (v) {
-                      setState(() {
-                        if (v == true) {
-                          _selectedProductIds.addAll(state.products.map(_id));
-                        } else {
-                          _selectedProductIds.clear();
-                        }
-                      });
-                    },
-                  )),
-                const DataColumn(label: Text('Imagen', style: TextStyle(fontWeight: FontWeight.w600))),
-                const DataColumn(label: Text('Nombre', style: TextStyle(fontWeight: FontWeight.w600))),
-                const DataColumn(label: Text('Precio', style: TextStyle(fontWeight: FontWeight.w600))),
-                const DataColumn(label: Text('Stock', style: TextStyle(fontWeight: FontWeight.w600))),
-                const DataColumn(label: Text('Destacado', style: TextStyle(fontWeight: FontWeight.w600))),
-                const DataColumn(label: Text('Acciones', style: TextStyle(fontWeight: FontWeight.w600))),
-              ],
-              rows: state.products.map((p) {
-                final pid = _id(p);
-                final name = p['name'] as String? ?? '';
-                final price = (p['price'] as num?)?.toDouble() ?? 0;
-                final stock = p['stock'] as int? ?? 0;
-                final isFeatured = p['is_featured'] == true || p['is_featured'] == 1;
-                final img = _extractFirstImage(p);
+      // ── Web: Responsive card grid ──
+      final screenWidth = MediaQuery.of(context).size.width;
+      final crossAxisCount = screenWidth > 1400 ? 5 : screenWidth > 1100 ? 4 : 3;
 
-                return DataRow(
-                  selected: _selectMode && _selectedProductIds.contains(pid),
-                  cells: [
-                    if (_selectMode)
-                      DataCell(Checkbox(
-                        value: _selectedProductIds.contains(pid),
-                        onChanged: (_) => _toggleProductSelection(pid),
-                      )),
-                    DataCell(
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: img.isNotEmpty
-                            ? CachedNetworkImage(
-                                imageUrl: img,
-                                width: 44,
-                                height: 44,
-                                fit: BoxFit.cover,
-                                errorWidget: (_, __, ___) =>
-                                    _imgPlaceholder(44),
-                              )
-                            : _imgPlaceholder(44),
-                      ),
+      return Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            // Select-all bar for web
+            if (_selectMode)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: state.products.isNotEmpty &&
+                          state.products.every((p) => _selectedProductIds.contains(_id(p))),
+                      onChanged: (v) {
+                        setState(() {
+                          if (v == true) {
+                            _selectedProductIds.addAll(state.products.map(_id));
+                          } else {
+                            _selectedProductIds.clear();
+                          }
+                        });
+                      },
                     ),
-                    DataCell(
-                      SizedBox(
-                        width: 200,
-                        child: Text(name,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
-                      ),
+                    Text(
+                      'Seleccionar todos (${state.products.length})',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                    DataCell(Text(_currencyFmt.format(price))),
-                    DataCell(
-                      _badge(
-                        'Stock: $stock',
-                        stock > 0
-                            ? AppTheme.successColor
-                            : AppTheme.errorColor,
-                      ),
-                    ),
-                    DataCell(
-                      IconButton(
-                        icon: Icon(
-                          isFeatured ? Icons.star : Icons.star_border,
-                          color: isFeatured ? Colors.amber : Colors.grey,
-                        ),
-                        onPressed: () => _bloc.add(ToggleFeatured(
-                          productId: (p['_id'] ?? p['id'] ?? '').toString(),
-                        )),
-                      ),
-                    ),
-                    DataCell(Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                          tooltip: 'Editar',
-                          onPressed: () =>
-                              _showProductForm(context, product: p),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.inventory, size: 20),
-                          tooltip: 'Stock',
-                          onPressed: () => _showStockDialog(p),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete_outline,
-                              size: 20, color: AppTheme.errorColor),
-                          tooltip: 'Eliminar',
-                          onPressed: () => _confirmAndDelete(p),
-                        ),
-                      ],
-                    )),
                   ],
-                );
-              }).toList(),
+                ),
+              ),
+            Expanded(
+              child: GridView.builder(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                  childAspectRatio: 0.72,
+                ),
+                itemCount: state.products.length,
+                itemBuilder: (_, i) => _webProductCard(state.products[i]),
+              ),
             ),
-          ),
+          ],
         ),
       );
     }
@@ -592,6 +518,177 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Web-optimized product card for grid layout.
+  Widget _webProductCard(Map<String, dynamic> product) {
+    final pid = _id(product);
+    final name = product['name'] as String? ?? 'Sin nombre';
+    final price = (product['price'] as num?)?.toDouble() ?? 0;
+    final stock = product['stock'] as int? ?? 0;
+    final isFeatured = product['is_featured'] == true || product['is_featured'] == 1;
+    final img = _extractFirstImage(product);
+    final isSelected = _selectMode && _selectedProductIds.contains(pid);
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: isSelected ? primary : Colors.grey.shade200,
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      color: isSelected ? primary.withOpacity(0.04) : Colors.white,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _selectMode
+            ? () => _toggleProductSelection(pid)
+            : () => _showProductForm(context, product: product),
+        onLongPress: !_selectMode
+            ? () {
+                setState(() => _selectMode = true);
+                _toggleProductSelection(pid);
+              }
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Image area ──
+            Expanded(
+              flex: 5,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  img.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: img,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: Colors.grey.shade100,
+                            child: Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade400),
+                          ),
+                        )
+                      : Container(
+                          color: Colors.grey.shade100,
+                          child: Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade400),
+                        ),
+                  // Featured star badge
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () => _bloc.add(ToggleFeatured(
+                        productId: (product['_id'] ?? product['id'] ?? '').toString(),
+                      )),
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4),
+                          ],
+                        ),
+                        child: Icon(
+                          isFeatured ? Icons.star_rounded : Icons.star_border_rounded,
+                          color: isFeatured ? Colors.amber : Colors.grey,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Select checkbox
+                  if (_selectMode)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Checkbox(
+                          value: isSelected,
+                          onChanged: (_) => _toggleProductSelection(pid),
+                          shape: const CircleBorder(),
+                        ),
+                      ),
+                    ),
+                  // Stock badge
+                  Positioned(
+                    bottom: 8,
+                    left: 8,
+                    child: _badge(
+                      stock > 0 ? 'Stock: $stock' : 'Agotado',
+                      stock > 0 ? AppTheme.successColor : AppTheme.errorColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // ── Info area ──
+            Expanded(
+              flex: 3,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, height: 1.3),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _currencyFmt.format(price),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Action buttons row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        _miniAction(Icons.edit_outlined, 'Editar', () => _showProductForm(context, product: product)),
+                        const SizedBox(width: 4),
+                        _miniAction(Icons.inventory_outlined, 'Stock', () => _showStockDialog(product)),
+                        const SizedBox(width: 4),
+                        _miniAction(Icons.delete_outline, 'Eliminar', () => _confirmAndDelete(product), color: AppTheme.errorColor),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniAction(IconData icon, String tooltip, VoidCallback onTap, {Color? color}) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: (color ?? Colors.grey).withOpacity(0.08),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(icon, size: 18, color: color ?? Colors.grey.shade700),
         ),
       ),
     );

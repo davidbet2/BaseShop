@@ -4,11 +4,23 @@ import 'dart:html' as html;
 String _lastFaviconUrl = '';
 
 /// Updates the browser tab favicon to the given [url].
-/// Adds a cache-busting query param to force the browser to reload the icon.
+/// Uses an Image element to preload — only applies if the image loads successfully.
 void updateWebFavicon(String url) {
   if (url.isEmpty) return;
   if (url == _lastFaviconUrl) return;
   _lastFaviconUrl = url;
+  try {
+    // Preload the image first — only update the favicon if it loads correctly
+    final testImg = html.ImageElement()..src = url;
+    testImg.onLoad.first.then((_) {
+      _applyFavicon(url);
+    }).catchError((_) {
+      // Image failed to load — keep the default favicon.png
+    });
+  } catch (_) {}
+}
+
+void _applyFavicon(String url) {
   try {
     var link = html.document.getElementById('dynamic-favicon') as html.LinkElement?;
     if (link == null) {
@@ -17,7 +29,6 @@ void updateWebFavicon(String url) {
         ..rel = 'icon';
       html.document.head?.append(link);
     }
-    // Cache-busting: append timestamp so the browser fetches the new image
     final cacheBust = DateTime.now().millisecondsSinceEpoch;
     final separator = url.contains('?') ? '&' : '?';
     link.type = 'image/png';

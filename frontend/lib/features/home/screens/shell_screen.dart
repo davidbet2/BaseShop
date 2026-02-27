@@ -233,8 +233,6 @@ class _WebHeaderBar extends StatelessWidget {
             _cartNavLink(context, primary, location),
             const SizedBox(width: 6),
             _navLink(context, 'Pedidos', Icons.receipt_outlined, '/orders', primary, location),
-            const SizedBox(width: 6),
-            _notificationBell(context, primary, location),
           ],
 
           if (isAdmin) ...[
@@ -253,6 +251,12 @@ class _WebHeaderBar extends StatelessWidget {
           if (!isAdmin) ...[
             const SizedBox(width: 6),
             _navLink(context, 'Políticas', Icons.policy_outlined, '/policies', primary, location),
+          ],
+
+          // Notification bell — at the end, right before profile
+          if (isAuthenticated && !isAdmin) ...[
+            const SizedBox(width: 6),
+            _notificationBell(context, primary, location),
           ],
 
           const SizedBox(width: 6),
