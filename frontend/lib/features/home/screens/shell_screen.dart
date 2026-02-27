@@ -14,6 +14,7 @@ import 'package:baseshop/features/cart/bloc/cart_state.dart';
 import 'package:baseshop/features/notifications/bloc/notifications_bloc.dart';
 import 'package:baseshop/features/notifications/bloc/notifications_event.dart';
 import 'package:baseshop/features/notifications/bloc/notifications_state.dart';
+import 'package:baseshop/features/notifications/repository/notifications_repository.dart';
 
 class ShellScreen extends StatelessWidget {
   final Widget child;
@@ -307,32 +308,58 @@ class _WebHeaderBar extends StatelessWidget {
   Widget _notificationBell(BuildContext context, Color primary, String location) {
     final isActive = location.startsWith('/notifications');
 
-    // Trigger a count refresh each time the header is built
-    try {
-      if (getIt.isRegistered<NotificationsBloc>()) {
-        // Use a factory so we need to get it fresh — but we want a lightweight check.
-        // Instead, use the repository directly for the badge.
-      }
-    } catch (_) {}
+    // Fetch unread count from repository directly (bloc is a factory)
+    final repo = getIt<NotificationsRepository>();
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: InkWell(
-        onTap: () => context.go('/notifications'),
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            color: isActive ? primary.withValues(alpha: 0.1) : Colors.transparent,
+    return FutureBuilder<int>(
+      future: repo.getUnreadCount(),
+      builder: (context, snapshot) {
+        final unread = snapshot.data ?? 0;
+
+        return MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: InkWell(
+            onTap: () => context.go('/notifications'),
             borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: isActive ? primary.withValues(alpha: 0.1) : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    isActive ? Icons.notifications_rounded : Icons.notifications_outlined,
+                    color: isActive ? primary : AppTheme.textSecondary,
+                    size: 22,
+                  ),
+                  if (unread > 0)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                        child: Text(
+                          unread > 99 ? '99+' : '$unread',
+                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w700),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
-          child: Icon(
-            isActive ? Icons.notifications_rounded : Icons.notifications_outlined,
-            color: isActive ? primary : AppTheme.textSecondary,
-            size: 22,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 

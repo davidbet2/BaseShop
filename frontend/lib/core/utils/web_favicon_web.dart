@@ -5,33 +5,49 @@ import 'dart:html' as html;
 String _lastFaviconUrl = '';
 
 /// Updates the browser tab favicon to the given [url].
-/// Directly sets the <link> href — no preload to avoid CanvasKit timing issues.
+/// Fetches the image via XHR (CORS-enabled) to bypass Cross-Origin-Resource-Policy,
+/// then creates a same-origin blob URL for the <link> element.
 void updateWebFavicon(String url) {
   if (url.isEmpty) return;
   if (url == _lastFaviconUrl) return;
   _lastFaviconUrl = url;
 
-  // Use a short delay to ensure the DOM is ready after Flutter bootstraps
-  Timer(const Duration(milliseconds: 300), () {
+  // Short delay for DOM readiness after Flutter bootstrap
+  Timer(const Duration(milliseconds: 500), () {
     try {
-      final cacheBust = DateTime.now().millisecondsSinceEpoch;
-      final separator = url.contains('?') ? '&' : '?';
-      final faviconUrl = '$url${separator}v=$cacheBust';
+      // Fetch the image via XHR — uses CORS mode (allowed by gateway)
+      final request = html.HttpRequest()
+        ..open('GET', url)
+        ..responseType = 'blob';
 
-      // Remove ALL existing favicon links to prevent browser caching old one
-      html.document.querySelectorAll('link[rel*="icon"]').forEach((el) {
-        el.remove();
-      });
+      request.onLoad.first.then((_) {
+        if (request.status == 200 && request.response != null) {
+          final blob = request.response as html.Blob;
+          final blobUrl = html.Url.createObjectUrlFromBlob(blob);
+          _setFaviconHref(blobUrl);
+        }
+      }).catchError((_) {});
 
-      // Create a fresh <link> element
-      final link = html.LinkElement()
-        ..id = 'dynamic-favicon'
-        ..rel = 'icon'
-        ..type = 'image/png'
-        ..href = faviconUrl;
-      html.document.head?.append(link);
+      request.onError.first.then((_) {}).catchError((_) {});
+      request.send();
     } catch (_) {}
   });
+}
+
+void _setFaviconHref(String href) {
+  try {
+    // Remove ALL existing favicon links
+    html.document.querySelectorAll('link[rel*="icon"]').forEach((el) {
+      el.remove();
+    });
+    // Create fresh <link>
+    final link = html.LinkElement()
+      ..id = 'dynamic-favicon'
+      ..rel = 'icon'
+      ..type = 'image/png'
+      ..href = href;
+    html.document.head?.append(link);
+  } catch (_) {}
 }
 
 /// Updates the browser tab title.
