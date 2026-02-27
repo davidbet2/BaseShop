@@ -71,13 +71,14 @@ async function notifyOrderService(orderId, paymentStatus, paymentId) {
     };
 
     const url = `${ORDERS_SERVICE_URL()}/api/orders/${orderId}/payment-status`;
+    const internalSecret = process.env.INTERNAL_SERVICE_SECRET || 'baseshop-internal-dev';
     await axios.patch(url, {
       status: newOrderStatus,
       payment_id: paymentId,
       payment_status: paymentStatus,
       note: noteMap[paymentStatus] || `Pago ${paymentStatus}`,
     }, {
-      headers: { 'X-Internal-Service': 'payments-service' },
+      headers: { 'X-Internal-Service': internalSecret },
       timeout: 5000,
     });
     console.log(`[payments-service] Notified orders-service: order ${orderId} → ${newOrderStatus}`);
