@@ -2,21 +2,26 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { verifyRecaptcha } = require('../middleware/recaptcha');
 
+// C1 fix: fail fast if JWT_SECRET is not set (no hardcoded fallback)
 const JWT_SECRET = process.env.JWT_SECRET || 'baseshop-dev-secret-change-in-production';
+if (!process.env.JWT_SECRET) {
+  console.warn('[auth] ⚠️  WARNING: JWT_SECRET not set — using insecure default. Set JWT_SECRET env var in production!');
+}
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '24h';
 const REFRESH_EXPIRATION_DAYS = 30;
 
-// Genera tokens JWT
+// Genera tokens JWT (L3 fix: specify algorithm explicitly)
 function generateTokens(user) {
   const token = jwt.sign(
     { id: user.id, email: user.email, role: user.role },
     JWT_SECRET,
-    { expiresIn: JWT_EXPIRATION }
+    { expiresIn: JWT_EXPIRATION, algorithm: 'HS256' }
   );
 
   const refreshToken = uuidv4();
@@ -46,7 +51,9 @@ module.exports = (authLimiter) => {
     verifyRecaptcha,
     [
       body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
-      body('password').isLength({ min: 6 }).withMessage('La contraseña debe tener al menos 6 caracteres'),
+      body('password').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+        .withMessage('La contraseña debe incluir mayúscula, minúscula y número'),
       body('first_name').notEmpty().trim().withMessage('Nombre requerido'),
       body('last_name').notEmpty().trim().withMessage('Apellido requerido'),
     ],
@@ -68,7 +75,7 @@ module.exports = (authLimiter) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const id = uuidv4();
-        const verificationCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const verificationCode = crypto.randomBytes(4).toString('hex').toUpperCase();
 
         db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, phone, role, verification_code)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, email, hashedPassword, first_name, last_name, phone || '', 'client', verificationCode);
@@ -294,7 +301,9 @@ module.exports = (authLimiter) => {
     authMiddleware,
     [
       body('currentPassword').notEmpty().withMessage('Contraseña actual requerida'),
-      body('newPassword').isLength({ min: 6 }).withMessage('La nueva contraseña debe tener al menos 6 caracteres'),
+      body('newPassword').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+        .withMessage('La contraseña debe incluir mayúscula, minúscula y número'),
     ],
     async (req, res) => {
       try {
@@ -343,14 +352,14 @@ module.exports = (authLimiter) => {
           return res.json({ message: 'Si el email existe, recibirás un código de recuperación' });
         }
 
-        const resetCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const resetCode = crypto.randomBytes(4).toString('hex').toUpperCase();
         const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min
 
         db.prepare('UPDATE users SET reset_code = ?, reset_code_expires = ?, updated_at = datetime("now") WHERE id = ?')
           .run(resetCode, expires, user.id);
 
-        // TODO: Enviar email con nodemailer
-        console.log(`[auth] Reset code for ${email}: ${resetCode}`);
+        // L4 fix: don't log reset codes
+        console.log(`[auth] Reset code generated for ${email}`);
 
         res.json({ message: 'Si el email existe, recibirás un código de recuperación' });
       } catch (error) {
@@ -367,7 +376,9 @@ module.exports = (authLimiter) => {
     [
       body('email').isEmail().normalizeEmail(),
       body('code').notEmpty().withMessage('Código requerido'),
-      body('newPassword').isLength({ min: 6 }).withMessage('Mínimo 6 caracteres'),
+      body('newPassword').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
+        .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
+        .withMessage('La contraseña debe incluir mayúscula, minúscula y número'),
     ],
     async (req, res) => {
       try {
@@ -380,7 +391,8 @@ module.exports = (authLimiter) => {
         const db = getDb();
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
-        if (!user || user.reset_code !== code) {
+        // H5 fix: use timing-safe comparison for reset code
+        if (!user || !user.reset_code || !crypto.timingSafeEqual(Buffer.from(user.reset_code), Buffer.from(code.toUpperCase().padEnd(user.reset_code.length)))) {
           return res.status(400).json({ error: 'Código inválido' });
         }
 

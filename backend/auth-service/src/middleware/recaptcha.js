@@ -47,7 +47,9 @@ const verifyRecaptcha = async (req, res, next) => {
     req.recaptchaScore = score;
     next();
   } catch (error) {
-    // Error de red con Google → permitir para no bloquear usuarios
+    // M4 fix: log warning but still allow (with a warning flag for rate-limiting)
+    console.warn('[reCAPTCHA] ⚠️  Google verification failed (network error):', error.message);
+    req.recaptchaBypass = true; // flag for downstream rate-limiting
     next();
   }
 };

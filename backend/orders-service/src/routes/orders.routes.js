@@ -44,9 +44,10 @@ router.patch('/:id/payment-status', [
   body('note').optional().isString(),
 ], (req, res) => {
   try {
-    // Verify internal service header
+    // H1 fix: verify internal service secret, not just header presence
     const internalHeader = req.headers['x-internal-service'];
-    if (!internalHeader) {
+    const expectedSecret = process.env.INTERNAL_SERVICE_SECRET || 'baseshop-internal-dev';
+    if (!internalHeader || internalHeader !== expectedSecret) {
       return res.status(403).json({ error: 'Acceso no autorizado' });
     }
 

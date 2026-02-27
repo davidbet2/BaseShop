@@ -201,7 +201,8 @@ router.post('/webhook/payu', async (req, res) => {
       apiKey, merchant_id, reference_sale, value, currency, state_pol
     );
 
-    if (sign && expectedSignature !== sign) {
+    // M7 fix: reject if signature is missing or invalid
+    if (!sign || expectedSignature !== sign) {
       console.warn('[payments-service] Invalid PayU webhook signature');
       // Log the attempt anyway
       const payment = db.prepare('SELECT * FROM payments WHERE id = ? OR order_id = ?').get(reference_sale, reference_sale);

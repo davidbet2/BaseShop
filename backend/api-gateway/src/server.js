@@ -53,23 +53,12 @@ app.use(rateLimit({
   legacyHeaders: false,
 }));
 
-// ── Health check ──
+// ── Health check (M2 fix: don't expose internal URLs) ──
 app.get('/health', (req, res) => {
   res.json({
     service: 'api-gateway',
     status: 'running',
     timestamp: new Date().toISOString(),
-    services: {
-      auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
-      users: process.env.USERS_SERVICE_URL || 'http://localhost:3002',
-      products: process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003',
-      cart: process.env.CART_SERVICE_URL || 'http://localhost:3004',
-      orders: process.env.ORDERS_SERVICE_URL || 'http://localhost:3005',
-      payments: process.env.PAYMENTS_SERVICE_URL || 'http://localhost:3006',
-      reviews: process.env.REVIEWS_SERVICE_URL || 'http://localhost:3007',
-      favorites: process.env.FAVORITES_SERVICE_URL || 'http://localhost:3008',
-      config: process.env.CONFIG_SERVICE_URL || 'http://localhost:3009',
-    },
   });
 });
 
