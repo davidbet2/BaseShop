@@ -409,29 +409,29 @@ test.describe.serial('Compra completa — Login → Producto → Checkout UI →
   test('4. Carrito → clic "Proceder al pago"', async () => {
     test.setTimeout(90_000);
 
-    // ── Create address via API ──
-    const addrResp = await page.request.post(`${API}/users/me/addresses`, {
-      data: {
-        label: 'Casa',
-        address: 'Calle 123 #45-67',
-        city: 'Bogotá',
-        state: 'Cundinamarca',
-        zip_code: '110111',
-        country: 'Colombia',
-        is_default: true,
-      },
-      headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+    // ── Get existing or create address via API ──
+    const listAddrResp = await page.request.get(`${API}/users/me/addresses`, {
+      headers: { Authorization: `Bearer ${authToken}` },
     });
-    if (addrResp.ok()) {
+    const existingAddrs = (await listAddrResp.json()).addresses || [];
+    if (existingAddrs.length > 0) {
+      savedAddress = existingAddrs.find(a => a.is_default === 1 || a.is_default === true) || existingAddrs[0];
+      console.log(`  ✓ Dirección existente: ${savedAddress.id}`);
+    } else {
+      const addrResp = await page.request.post(`${API}/users/me/addresses`, {
+        data: {
+          label: 'Casa',
+          address: 'Calle 123 #45-67',
+          city: 'Bogotá',
+          state: 'Cundinamarca',
+          zip_code: '110111',
+          country: 'Colombia',
+          is_default: true,
+        },
+        headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+      });
       savedAddress = (await addrResp.json()).address;
       console.log(`  ✓ Dirección creada: ${savedAddress.id}`);
-    } else {
-      const listResp = await page.request.get(`${API}/users/me/addresses`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      const addrList = (await listResp.json()).addresses || [];
-      savedAddress = addrList[0];
-      console.log(`  ✓ Dirección existente: ${savedAddress?.id}`);
     }
     expect(savedAddress).toBeTruthy();
 

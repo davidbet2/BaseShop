@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
+import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
+import 'package:baseshop/features/profile/repository/address_repository.dart';
 
 class AddressesScreen extends StatefulWidget {
   const AddressesScreen({super.key});
@@ -12,6 +12,7 @@ class AddressesScreen extends StatefulWidget {
 }
 
 class _AddressesScreenState extends State<AddressesScreen> {
+  final AddressRepository _repo = getIt<AddressRepository>();
   List<Map<String, dynamic>> _addresses = [];
   bool _loading = true;
 
@@ -22,17 +23,17 @@ class _AddressesScreenState extends State<AddressesScreen> {
   }
 
   Future<void> _loadAddresses() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('user_addresses') ?? '[]';
-    setState(() {
-      _addresses = List<Map<String, dynamic>>.from(jsonDecode(raw));
-      _loading = false;
-    });
-  }
-
-  Future<void> _saveAddresses() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('user_addresses', jsonEncode(_addresses));
+    try {
+      final addresses = await _repo.getAddresses();
+      if (mounted) {
+        setState(() {
+          _addresses = addresses;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -68,7 +69,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
       separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
         final addr = _addresses[i];
-        final isDefault = addr['is_default'] == true;
+        final isDefault = addr['is_default'] == true || addr['is_default'] == 1;
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -120,7 +121,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
               const SizedBox(height: 2),
               Text(addr['address'] ?? '', style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary, height: 1.4)),
               if ((addr['city'] ?? '').toString().isNotEmpty)
-                Text('${addr['city']}, ${addr['state'] ?? ''} ${addr['zip'] ?? ''}',
+                Text('${addr['city']}, ${addr['state'] ?? ''} ${addr['zip_code'] ?? addr['zip'] ?? ''}',
                   style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary)),
               if ((addr['phone'] ?? '').toString().isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -133,22 +134,41 @@ class _AddressesScreenState extends State<AddressesScreen> {
     );
   }
 
-  void _handleMenu(String action, int index) {
-    if (action == 'default') {
-      setState(() {
-        for (var a in _addresses) { a['is_default'] = false; }
-        _addresses[index]['is_default'] = true;
-      });
-      _saveAddresses();
+  void _handleMenu(String action, int index) async {
+    final addr = _addresses[index];
+    final id = addr['id']?.toString();
+    if (action == 'default' && id != null) {
+      try {
+        await _repo.setDefault(id);
+        await _loadAddresses();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          );
+        }
+      }
     } else if (action == 'edit') {
       _showAddDialog(editIndex: index);
-    } else if (action == 'delete') {
-      setState(() => _addresses.removeAt(index));
-      _saveAddresses();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: const Text('Dirección eliminada'), backgroundColor: AppTheme.successColor,
-          behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-      );
+    } else if (action == 'delete' && id != null) {
+      try {
+        await _repo.deleteAddress(id);
+        await _loadAddresses();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: const Text('Dirección eliminada'), backgroundColor: AppTheme.successColor,
+              behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al eliminar: $e'), backgroundColor: AppTheme.errorColor,
+              behavior: SnackBarBehavior.floating, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          );
+        }
+      }
     }
   }
 
@@ -175,7 +195,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
     final addressCtrl = TextEditingController(text: (existing['address'] ?? '').toString());
     final cityCtrl = TextEditingController(text: (existing['city'] ?? '').toString());
     final stateCtrl = TextEditingController(text: (existing['state'] ?? '').toString());
-    final zipCtrl = TextEditingController(text: (existing['zip'] ?? '').toString());
+    final zipCtrl = TextEditingController(text: (existing['zip_code'] ?? existing['zip'] ?? '').toString());
     final phoneCtrl = TextEditingController(text: (existing['phone'] ?? '').toString());
 
     showModalBottomSheet(
@@ -215,7 +235,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
               SizedBox(
                 width: double.infinity, height: 52,
                 child: ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
                     if (nameCtrl.text.trim().isEmpty || addressCtrl.text.trim().isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: const Text('Nombre y dirección son obligatorios'),
@@ -224,32 +244,54 @@ class _AddressesScreenState extends State<AddressesScreen> {
                       );
                       return;
                     }
-                    final newAddr = {
-                      'label': labelCtrl.text.trim().isNotEmpty ? labelCtrl.text.trim() : 'Dirección',
-                      'name': nameCtrl.text.trim(),
-                      'address': addressCtrl.text.trim(),
-                      'city': cityCtrl.text.trim(),
-                      'state': stateCtrl.text.trim(),
-                      'zip': zipCtrl.text.trim(),
-                      'phone': phoneCtrl.text.trim(),
-                      'is_default': isEdit ? (existing['is_default'] ?? false) : _addresses.isEmpty,
-                    };
-                    setState(() {
-                      if (isEdit) {
-                        _addresses[editIndex] = newAddr;
-                      } else {
-                        _addresses.add(newAddr);
-                      }
-                    });
-                    _saveAddresses();
+                    final label = labelCtrl.text.trim().isNotEmpty ? labelCtrl.text.trim() : 'Dirección';
+                    final addrText = addressCtrl.text.trim();
+                    final city = cityCtrl.text.trim();
+                    final stateVal = stateCtrl.text.trim();
+                    final zip = zipCtrl.text.trim();
+                    final name = nameCtrl.text.trim();
+                    final phone = phoneCtrl.text.trim();
+
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isEdit ? 'Dirección actualizada' : 'Dirección agregada'),
-                        backgroundColor: AppTheme.successColor, behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
+
+                    try {
+                      if (isEdit) {
+                        final id = existing['id']?.toString();
+                        if (id != null) {
+                          await _repo.updateAddress(id,
+                            label: label, address: addrText, city: city,
+                            state: stateVal, zipCode: zip,
+                          );
+                        }
+                      } else {
+                        await _repo.createAddress(
+                          label: label, address: addrText, city: city,
+                          state: stateVal, zipCode: zip,
+                          isDefault: _addresses.isEmpty,
+                          name: name, phone: phone,
+                        );
+                      }
+                      await _loadAddresses();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(isEdit ? 'Dirección actualizada' : 'Dirección agregada'),
+                            backgroundColor: AppTheme.successColor, behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $e'),
+                            backgroundColor: AppTheme.errorColor, behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      }
+                    }
                   },
                   child: Text(isEdit ? 'Guardar cambios' : 'Agregar dirección', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ),

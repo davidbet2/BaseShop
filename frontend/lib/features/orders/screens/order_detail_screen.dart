@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -8,6 +10,8 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:baseshop/core/di/injection.dart';
+import 'package:baseshop/core/constants/api_constants.dart';
+import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
 import 'package:baseshop/features/orders/bloc/orders_bloc.dart';
 import 'package:baseshop/features/orders/bloc/orders_event.dart';
@@ -25,6 +29,8 @@ class OrderDetailScreen extends StatefulWidget {
 class _OrderDetailScreenState extends State<OrderDetailScreen> {
   late final OrdersBloc _bloc;
   Map<String, dynamic>? _currentOrder;
+  Map<String, dynamic>? _paymentDetail;
+  bool _paymentLoading = false;
 
   final _currencyFormat = NumberFormat.currency(
     locale: 'es_CO',
@@ -37,6 +43,23 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     super.initState();
     _bloc = getIt<OrdersBloc>();
     _bloc.add(LoadOrderDetail(widget.orderId));
+  }
+
+  Future<void> _fetchPaymentDetail(String orderId) async {
+    if (_paymentLoading || _paymentDetail != null) return;
+    _paymentLoading = true;
+    try {
+      final apiClient = getIt<ApiClient>();
+      final resp = await apiClient.dio.get('${ApiConstants.paymentByOrder}/$orderId');
+      final data = resp.data;
+      if (data is Map<String, dynamic> && data.containsKey('data')) {
+        if (mounted) setState(() => _paymentDetail = Map<String, dynamic>.from(data['data']));
+      }
+    } catch (_) {
+      // Payment detail is optional, ignore errors
+    } finally {
+      _paymentLoading = false;
+    }
   }
 
   @override
@@ -75,11 +98,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
             }
 
             if (state is OrderDetailLoaded) {
-              // Store for AppBar actions
+              // Store for AppBar actions + fetch payment detail
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (_currentOrder == null) {
                   setState(() => _currentOrder = state.order);
                 }
+                _fetchPaymentDetail(state.order['id'] ?? widget.orderId);
               });
               return _buildOrderDetail(context, state.order);
             }
@@ -231,12 +255,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
-            Card(
-              child: ListTile(
-                leading: Icon(Icons.payment, color: Theme.of(context).colorScheme.primary),
-                title: Text(_formatPaymentMethod(paymentMethod)),
-              ),
-            ),
+            _buildPaymentCard(paymentMethod, order),
             const SizedBox(height: 16),
           ],
 
@@ -305,8 +324,15 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final total = (order['total'] ?? 0) as num;
     final paymentMethod =
         (order['paymentMethod'] ?? order['payment_method'] ?? '').toString();
-    final shippingAddress =
+    final rawSummaryAddress =
         order['shippingAddress'] ?? order['shipping_address'];
+    // Parse JSON string if needed
+    dynamic shippingAddress = rawSummaryAddress;
+    if (shippingAddress is String && shippingAddress.trim().startsWith('{')) {
+      try {
+        shippingAddress = jsonDecode(shippingAddress);
+      } catch (_) {}
+    }
 
     String dateStr = '';
     final createdAt = order['createdAt'] ?? order['created_at'];
@@ -332,7 +358,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       final name =
           (item['productName'] ?? item['product_name'] ?? item['name'] ?? 'Producto')
               .toString();
-      final price = (item['price'] ?? item['productPrice'] ?? 0) as num;
+      final price = (item['price'] ?? item['productPrice'] ?? item['product_price'] ?? 0) as num;
       final quantity = (item['quantity'] ?? 1) as int;
       buf.writeln('  • $name x$quantity — ${_currencyFormat.format(price * quantity)}');
     }
@@ -393,7 +419,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     final name =
         (item['productName'] ?? item['product_name'] ?? item['name'] ?? 'Producto')
             .toString();
-    final price = (item['price'] ?? item['productPrice'] ?? 0) as num;
+    final price = (item['price'] ?? item['productPrice'] ?? item['product_price'] ?? 0) as num;
     final quantity = (item['quantity'] ?? 1) as int;
     final image =
         (item['productImage'] ?? item['product_image'] ?? item['image'] ?? '')
@@ -575,25 +601,58 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   }
 
   Widget _buildAddress(dynamic address) {
-    if (address is Map<String, dynamic>) {
-      final street = address['street'] ?? address['address'] ?? '';
-      final city = address['city'] ?? '';
-      final state = address['state'] ?? address['department'] ?? '';
-      final zip = address['zipCode'] ?? address['zip_code'] ?? address['postalCode'] ?? '';
-      final country = address['country'] ?? 'Colombia';
+    // Parse JSON string if needed
+    dynamic addr = address;
+    if (addr is String && addr.trim().startsWith('{')) {
+      try {
+        addr = jsonDecode(addr);
+      } catch (_) {
+        // keep as string
+      }
+    }
+
+    if (addr is Map<String, dynamic>) {
+      final label = addr['label'] ?? '';
+      final street = addr['street'] ?? addr['address'] ?? '';
+      final city = addr['city'] ?? '';
+      final state = addr['state'] ?? addr['department'] ?? '';
+      final zip = addr['zipCode'] ?? addr['zip_code'] ?? addr['postalCode'] ?? '';
+      final country = addr['country'] ?? 'Colombia';
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (street.toString().isNotEmpty) Text(street.toString()),
+          if (label.toString().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.home_outlined, size: 16, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    label.toString(),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (street.toString().isNotEmpty)
+            Text(street.toString(), style: const TextStyle(fontSize: 14)),
           if (city.toString().isNotEmpty || state.toString().isNotEmpty)
-            Text('${city.toString()}${state.toString().isNotEmpty ? ', $state' : ''}'),
-          if (zip.toString().isNotEmpty) Text('CP: $zip'),
-          Text(country.toString()),
+            Text(
+              '${city.toString()}${state.toString().isNotEmpty ? ', $state' : ''}',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+            ),
+          if (zip.toString().isNotEmpty)
+            Text('CP: $zip', style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+          Text(country.toString(), style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
         ],
       );
     }
-    return Text(address.toString());
+    return Text(addr.toString());
   }
 
   Widget _buildStatusBadge(String status) {
@@ -638,6 +697,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   String _formatPaymentMethod(String method) {
     switch (method.toLowerCase()) {
+      case 'card':
+        return 'Tarjeta de crédito/débito';
       case 'credit_card':
       case 'creditcard':
         return 'Tarjeta de Crédito';
@@ -657,6 +718,124 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       default:
         return method;
     }
+  }
+
+  Widget _buildPaymentCard(String paymentMethod, Map<String, dynamic> order) {
+    final paymentStatus = _paymentDetail?['status'];
+    final provider = _paymentDetail?['provider'] ?? '';
+    final providerRef = _paymentDetail?['provider_reference'] ?? '';
+
+    String statusLabel = '';
+    Color statusColor = Colors.grey;
+    IconData statusIcon = Icons.hourglass_empty;
+
+    if (paymentStatus != null) {
+      switch (paymentStatus.toString().toLowerCase()) {
+        case 'approved':
+          statusLabel = 'Aprobado';
+          statusColor = AppTheme.successColor;
+          statusIcon = Icons.check_circle_outline;
+          break;
+        case 'declined':
+          statusLabel = 'Rechazado';
+          statusColor = AppTheme.errorColor;
+          statusIcon = Icons.cancel_outlined;
+          break;
+        case 'pending':
+        case 'pending_validation':
+          statusLabel = 'Pendiente';
+          statusColor = Colors.orange;
+          statusIcon = Icons.schedule;
+          break;
+        case 'expired':
+          statusLabel = 'Expirado';
+          statusColor = Colors.grey;
+          statusIcon = Icons.timer_off;
+          break;
+        case 'error':
+          statusLabel = 'Error';
+          statusColor = AppTheme.errorColor;
+          statusIcon = Icons.error_outline;
+          break;
+        default:
+          statusLabel = paymentStatus.toString();
+      }
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  paymentMethod == 'card' ? Icons.credit_card : Icons.payment,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _formatPaymentMethod(paymentMethod),
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                      if (provider.toString().isNotEmpty)
+                        Text(
+                          'Proveedor: ${provider.toString().toUpperCase()}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                        ),
+                    ],
+                  ),
+                ),
+                if (statusLabel.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(statusIcon, size: 14, color: statusColor),
+                        const SizedBox(width: 4),
+                        Text(
+                          statusLabel,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (providerRef.toString().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              const Divider(height: 1),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.receipt_long, size: 14, color: Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Ref: ${providerRef.toString()}',
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildErrorState(String message) {

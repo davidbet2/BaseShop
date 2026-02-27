@@ -281,22 +281,25 @@ async function doProductAndCart(page, h, authToken) {
 async function doCartToCheckout(page, h, authToken) {
   console.log('  ── STEP: Carrito → Checkout ──');
 
-  // Create or get address
+  // Get existing or create address
   let savedAddress;
-  const addrResp = await page.request.post(`${API}/users/me/addresses`, {
-    data: {
-      label: 'Casa', address: 'Calle 123 #45-67', city: 'Bogotá',
-      state: 'Cundinamarca', zip_code: '110111', country: 'Colombia', is_default: true,
-    },
-    headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
+  const listResp = await page.request.get(`${API}/users/me/addresses`, {
+    headers: { Authorization: `Bearer ${authToken}` },
   });
-  if (addrResp.ok()) {
-    savedAddress = (await addrResp.json()).address;
+  const existingAddresses = (await listResp.json()).addresses || [];
+  if (existingAddresses.length > 0) {
+    savedAddress = existingAddresses.find(a => a.is_default === 1 || a.is_default === true) || existingAddresses[0];
+    console.log(`  ✓ Dirección existente: ${savedAddress.id}`);
   } else {
-    const listResp = await page.request.get(`${API}/users/me/addresses`, {
-      headers: { Authorization: `Bearer ${authToken}` },
+    const addrResp = await page.request.post(`${API}/users/me/addresses`, {
+      data: {
+        label: 'Casa', address: 'Calle 123 #45-67', city: 'Bogotá',
+        state: 'Cundinamarca', zip_code: '110111', country: 'Colombia', is_default: true,
+      },
+      headers: { Authorization: `Bearer ${authToken}`, 'Content-Type': 'application/json' },
     });
-    savedAddress = ((await listResp.json()).addresses || [])[0];
+    savedAddress = (await addrResp.json()).address;
+    console.log(`  ✓ Dirección creada: ${savedAddress.id}`);
   }
   expect(savedAddress).toBeTruthy();
   console.log(`  ✓ Dirección: ${savedAddress.id}`);

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
@@ -15,6 +13,7 @@ import 'package:baseshop/features/cart/bloc/cart_state.dart';
 import 'package:baseshop/features/orders/bloc/orders_bloc.dart';
 import 'package:baseshop/features/orders/bloc/orders_event.dart';
 import 'package:baseshop/features/orders/bloc/orders_state.dart';
+import 'package:baseshop/features/profile/repository/address_repository.dart';
 
 class CheckoutScreen extends StatefulWidget {
   const CheckoutScreen({super.key});
@@ -53,15 +52,20 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _loadAddresses() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('user_addresses') ?? '[]';
-    final list = List<Map<String, dynamic>>.from(jsonDecode(raw));
-    setState(() {
-      _addresses = list;
-      // Select default address
-      final defaultIdx = list.indexWhere((a) => a['is_default'] == true);
-      _selectedAddressIndex = defaultIdx >= 0 ? defaultIdx : (list.isNotEmpty ? 0 : -1);
-    });
+    try {
+      final repo = getIt<AddressRepository>();
+      final list = await repo.getAddresses();
+      if (mounted) {
+        setState(() {
+          _addresses = list;
+          // Select default address — backend uses is_default = 1 (int)
+          final defaultIdx = list.indexWhere((a) => a['is_default'] == true || a['is_default'] == 1);
+          _selectedAddressIndex = defaultIdx >= 0 ? defaultIdx : (list.isNotEmpty ? 0 : -1);
+        });
+      }
+    } catch (_) {
+      // If API fails, addresses stay empty
+    }
   }
 
   void _goToStep(int step) {

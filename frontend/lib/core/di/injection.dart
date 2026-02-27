@@ -25,6 +25,8 @@ import 'package:baseshop/features/reviews/repository/reviews_repository.dart';
 import 'package:baseshop/features/favorites/repository/favorites_repository.dart';
 import 'package:baseshop/features/favorites/bloc/favorites_bloc.dart';
 
+import 'package:baseshop/features/profile/repository/address_repository.dart';
+
 final GetIt getIt = GetIt.instance;
 
 void configureDependencies() {
@@ -66,6 +68,10 @@ void configureDependencies() {
 
   getIt.registerLazySingleton<FavoritesRepository>(
     () => FavoritesRepository(getIt<ApiClient>()),
+  );
+
+  getIt.registerLazySingleton<AddressRepository>(
+    () => AddressRepository(getIt<ApiClient>()),
   );
 
   // ── BLoCs ────────────────────────────────────────────────
