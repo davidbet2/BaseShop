@@ -576,6 +576,33 @@ router.patch('/notifications/me/read-all', (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// PATCH /api/orders/notifications/me/:id/read — Marcar una notificación como leída
+// ──────────────────────────────────────────────
+router.patch('/notifications/me/:id/read', (req, res) => {
+  try {
+    const db = getDb();
+    const userId = req.user.id || req.user.userId;
+    const { id } = req.params;
+
+    const notif = db.prepare(
+      'SELECT * FROM notifications WHERE id = ? AND user_id = ?'
+    ).get(id, userId);
+
+    if (!notif) {
+      return res.status(404).json({ error: 'Notificación no encontrada' });
+    }
+
+    db.prepare(
+      'UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?'
+    ).run(id, userId);
+
+    res.json({ message: 'Notificación marcada como leída' });
+  } catch (error) {
+    res.status(500).json({ error: 'Error al marcar notificación como leída' });
+  }
+});
+
+// ──────────────────────────────────────────────
 // DELETE /api/orders/notifications/me/:id — Eliminar una notificación
 // ──────────────────────────────────────────────
 router.delete('/notifications/me/:id', (req, res) => {

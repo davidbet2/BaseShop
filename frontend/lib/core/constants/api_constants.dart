@@ -49,6 +49,7 @@ class ApiConstants {
   static const String myNotifications = '/orders/notifications/me';
   static const String unreadNotificationsCount = '/orders/notifications/me/unread-count';
   static const String readAllNotifications = '/orders/notifications/me/read-all';
+  // Single notification read: '${myNotifications}/$id/read' (built dynamically)
 
   // ── Payments ──
   static const String payments = '/payments';

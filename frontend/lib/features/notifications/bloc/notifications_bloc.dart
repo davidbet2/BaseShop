@@ -10,6 +10,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     on<LoadNotifications>(_onLoad);
     on<LoadUnreadCount>(_onLoadUnreadCount);
     on<MarkAllNotificationsRead>(_onMarkAllRead);
+    on<MarkNotificationRead>(_onMarkRead);
     on<DeleteNotification>(_onDelete);
     on<DeleteAllNotifications>(_onDeleteAll);
   }
@@ -56,6 +57,18 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       add(const LoadNotifications());
     } catch (e) {
       emit(NotificationsError('Error: $e'));
+    }
+  }
+
+  Future<void> _onMarkRead(
+    MarkNotificationRead event,
+    Emitter<NotificationsState> emit,
+  ) async {
+    try {
+      await _repository.markAsRead(event.notificationId);
+      add(const LoadNotifications());
+    } catch (_) {
+      // Silently fail — still allow navigation
     }
   }
 

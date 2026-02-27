@@ -226,13 +226,6 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                         const SizedBox(height: 80),
                       ]),
               ),
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: _currentColor,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.save),
-          label: const Text('Guardar cambios'),
-          onPressed: _save,
-        ),
       ),
     );
   }

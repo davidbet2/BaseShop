@@ -5,7 +5,7 @@ const fs = require('fs');
 let rawDb;
 let db;
 
-const DB_PATH = path.resolve(process.env.DB_PATH || './data/orders.db');
+const DB_PATH = path.resolve(process.env.DB_PATH || path.join(__dirname, '..', 'data', 'orders-service.db'));
 
 class Statement {
   constructor(rawDb, sql) {

@@ -215,9 +215,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         color: isRead ? null : Theme.of(context).colorScheme.primary.withOpacity(0.04),
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: orderId != null && orderId.isNotEmpty
-              ? () => context.push('/orders/$orderId')
-              : null,
+          onTap: () {
+            // Mark as read when tapped
+            if (!isRead) {
+              _bloc.add(MarkNotificationRead(notificationId: id));
+            }
+            // Navigate to order if applicable
+            if (orderId != null && orderId.isNotEmpty) {
+              context.push('/orders/$orderId');
+            }
+          },
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: Row(

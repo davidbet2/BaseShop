@@ -38,6 +38,11 @@ class NotificationsRepository {
     await _apiClient.dio.patch(ApiConstants.readAllNotifications);
   }
 
+  /// Mark a single notification as read.
+  Future<void> markAsRead(String id) async {
+    await _apiClient.dio.patch('${ApiConstants.myNotifications}/$id/read');
+  }
+
   /// Delete a single notification.
   Future<void> deleteNotification(String id) async {
     await _apiClient.dio.delete('${ApiConstants.myNotifications}/$id');
