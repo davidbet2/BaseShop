@@ -1,27 +1,34 @@
 // ══════════════════════════════════════════════════════════
-// Brevo (Sendinblue) Email Service
+// Brevo SMTP Email Service (via nodemailer)
 // Envía emails transaccionales: verificación y recuperación
 // ══════════════════════════════════════════════════════════
-const SibApiV3Sdk = require('sib-api-v3-sdk');
+const nodemailer = require('nodemailer');
 
-const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
+const SMTP_HOST = process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com';
+const SMTP_PORT = parseInt(process.env.BREVO_SMTP_PORT || '587', 10);
+const SMTP_USER = process.env.BREVO_SMTP_USER || '';
+const SMTP_PASS = process.env.BREVO_SMTP_PASS || '';
 const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'shopbrevosmtp@gmail.com';
 const SENDER_NAME = process.env.BREVO_SENDER_NAME || 'BaseShop';
 
-let apiInstance = null;
+let transporter = null;
 
-function getApi() {
-  if (!apiInstance) {
-    if (!BREVO_API_KEY) {
-      console.warn('[Brevo] ⚠️  BREVO_API_KEY not set — emails will be logged to console (dev mode)');
+function getTransporter() {
+  if (!transporter) {
+    if (!SMTP_USER || !SMTP_PASS) {
+      console.warn('[Brevo] ⚠️  SMTP credentials not set — emails will be logged to console (dev mode)');
       return null;
     }
-    const defaultClient = SibApiV3Sdk.ApiClient.instance;
-    const apiKey = defaultClient.authentications['api-key'];
-    apiKey.apiKey = BREVO_API_KEY;
-    apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+    transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: false, // STARTTLS
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+      tls: { rejectUnauthorized: false },
+    });
+    console.log(`[Brevo] SMTP transport ready → ${SMTP_HOST}:${SMTP_PORT}`);
   }
-  return apiInstance;
+  return transporter;
 }
 
 /**
@@ -32,15 +39,39 @@ function generateCode() {
 }
 
 /**
+ * Envía un email genérico vía SMTP
+ */
+async function sendMail(to, toName, subject, htmlContent) {
+  let smtp;
+  try { smtp = getTransporter(); } catch (err) {
+    console.error('[Brevo] Transport error:', err.message);
+    smtp = null;
+  }
+
+  if (!smtp) {
+    console.log(`[Brevo-DEV] 📧 ${subject} → ${to}`);
+    return true;
+  }
+
+  try {
+    const info = await smtp.sendMail({
+      from: `"${SENDER_NAME}" <${SENDER_EMAIL}>`,
+      to: toName ? `"${toName}" <${to}>` : to,
+      subject,
+      html: htmlContent,
+    });
+    console.log(`[Brevo] ✅ Email sent to ${to} (messageId: ${info.messageId})`);
+    return true;
+  } catch (error) {
+    console.error('[Brevo] ❌ Error sending email:', error.message || error);
+    return false;
+  }
+}
+
+/**
  * Envía email de verificación de cuenta
  */
 async function sendVerificationEmail(toEmail, toName, code) {
-  let api;
-  try { api = getApi(); } catch (err) {
-    console.error('[Brevo] getApi error:', err.message);
-    api = null;
-  }
-
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff;">
       <div style="text-align: center; margin-bottom: 32px;">
@@ -56,38 +87,13 @@ async function sendVerificationEmail(toEmail, toName, code) {
       <p style="font-size: 12px; color: #d1d5db; text-align: center;">${SENDER_NAME}</p>
     </div>
   `;
-
-  if (!api) {
-    console.log(`[Brevo-DEV] 📧 Verification email to ${toEmail} — code: ${code}`);
-    return true;
-  }
-
-  try {
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = `${SENDER_NAME} — Código de verificación: ${code}`;
-    sendSmtpEmail.htmlContent = htmlContent;
-    sendSmtpEmail.sender = { name: SENDER_NAME, email: SENDER_EMAIL };
-    sendSmtpEmail.to = [{ email: toEmail, name: toName || '' }];
-
-    await api.sendTransacEmail(sendSmtpEmail);
-    console.log(`[Brevo] ✅ Verification email sent to ${toEmail}`);
-    return true;
-  } catch (error) {
-    console.error('[Brevo] ❌ Error sending verification email:', error.message || error);
-    return false;
-  }
+  return sendMail(toEmail, toName, `${SENDER_NAME} — Código de verificación: ${code}`, htmlContent);
 }
 
 /**
  * Envía email de recuperación de contraseña
  */
 async function sendPasswordResetEmail(toEmail, toName, code) {
-  let api;
-  try { api = getApi(); } catch (err) {
-    console.error('[Brevo] getApi error:', err.message);
-    api = null;
-  }
-
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff;">
       <div style="text-align: center; margin-bottom: 32px;">
@@ -103,26 +109,7 @@ async function sendPasswordResetEmail(toEmail, toName, code) {
       <p style="font-size: 12px; color: #d1d5db; text-align: center;">${SENDER_NAME}</p>
     </div>
   `;
-
-  if (!api) {
-    console.log(`[Brevo-DEV] 📧 Password reset email to ${toEmail} — code: ${code}`);
-    return true;
-  }
-
-  try {
-    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-    sendSmtpEmail.subject = `${SENDER_NAME} — Código de recuperación: ${code}`;
-    sendSmtpEmail.htmlContent = htmlContent;
-    sendSmtpEmail.sender = { name: SENDER_NAME, email: SENDER_EMAIL };
-    sendSmtpEmail.to = [{ email: toEmail, name: toName || '' }];
-
-    await api.sendTransacEmail(sendSmtpEmail);
-    console.log(`[Brevo] ✅ Password reset email sent to ${toEmail}`);
-    return true;
-  } catch (error) {
-    console.error('[Brevo] ❌ Error sending password reset email:', error.message || error);
-    return false;
-  }
+  return sendMail(toEmail, toName, `${SENDER_NAME} — Código de recuperación: ${code}`, htmlContent);
 }
 
 module.exports = { generateCode, sendVerificationEmail, sendPasswordResetEmail };
