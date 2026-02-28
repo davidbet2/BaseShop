@@ -35,7 +35,11 @@ function generateCode() {
  * Envía email de verificación de cuenta
  */
 async function sendVerificationEmail(toEmail, toName, code) {
-  const api = getApi();
+  let api;
+  try { api = getApi(); } catch (err) {
+    console.error('[Brevo] getApi error:', err.message);
+    api = null;
+  }
 
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff;">
@@ -78,7 +82,11 @@ async function sendVerificationEmail(toEmail, toName, code) {
  * Envía email de recuperación de contraseña
  */
 async function sendPasswordResetEmail(toEmail, toName, code) {
-  const api = getApi();
+  let api;
+  try { api = getApi(); } catch (err) {
+    console.error('[Brevo] getApi error:', err.message);
+    api = null;
+  }
 
   const htmlContent = `
     <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; background: #ffffff;">

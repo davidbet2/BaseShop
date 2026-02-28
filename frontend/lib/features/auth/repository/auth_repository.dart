@@ -54,7 +54,11 @@ class AuthRepository {
       },
     );
 
-    final data = response.data as Map<String, dynamic>;
+    final raw = response.data;
+    if (raw == null || raw is! Map<String, dynamic>) {
+      throw Exception('Respuesta inesperada del servidor');
+    }
+    final data = raw;
 
     // If registration requires email verification, don't set tokens
     if (data['requiresVerification'] == true) {
@@ -65,7 +69,11 @@ class AuthRepository {
       data['token']?.toString() ?? '',
       data['refreshToken']?.toString() ?? '',
     );
-    return data['user'] as Map<String, dynamic>;
+    final user = data['user'];
+    if (user == null || user is! Map<String, dynamic>) {
+      throw Exception(data['error']?.toString() ?? 'Error al registrar usuario');
+    }
+    return user;
   }
 
   // ── Google Sign-In ─────────────────────────────────────────
