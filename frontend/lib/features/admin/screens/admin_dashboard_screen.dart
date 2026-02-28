@@ -489,6 +489,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: DataTable(
+          showCheckboxColumn: false,
           headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
           columnSpacing: 24,
           columns: const [

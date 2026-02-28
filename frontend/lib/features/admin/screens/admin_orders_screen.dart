@@ -408,6 +408,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             child: ConstrainedBox(
               constraints: BoxConstraints(minWidth: constraints.maxWidth),
               child: DataTable(
+                showCheckboxColumn: false,
                 headingRowColor: WidgetStateProperty.all(Colors.grey.shade50),
                 columnSpacing: 20,
                 columns: const [

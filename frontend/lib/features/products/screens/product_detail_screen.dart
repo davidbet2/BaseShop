@@ -172,17 +172,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
               ),
               _buildCircleBtn(Icons.share_outlined, () => _shareProduct(name, price)),
-              const SizedBox(width: 8),
-              BlocBuilder<FavoritesBloc, FavoritesState>(
-                builder: (context, favState) {
-                  final isFav = favState is FavoritesLoaded && favState.favoriteIds.contains(widget.productId);
-                  return _buildCircleBtn(
-                    isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                    () => _toggleFavorite(isFav, name, price, imageUrl),
-                    color: isFav ? AppTheme.errorColor : null,
-                  );
-                },
-              ),
             ],
           ),
         ),
@@ -389,30 +378,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(8),
-                  child: BlocBuilder<FavoritesBloc, FavoritesState>(
-                    builder: (context, favState) {
-                      final isFav = favState is FavoritesLoaded && favState.favoriteIds.contains(widget.productId);
-                      return GestureDetector(
-                        onTap: () => _toggleFavorite(isFav, name, price, imageUrl),
-                        child: Container(
-                          width: 40, height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8)],
-                          ),
-                          child: Icon(
-                            isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                            size: 22,
-                            color: isFav ? AppTheme.errorColor : AppTheme.textSecondary,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+
               ],
               flexibleSpace: FlexibleSpaceBar(
                 background: Stack(

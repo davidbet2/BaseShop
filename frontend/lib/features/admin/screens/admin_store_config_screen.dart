@@ -177,14 +177,14 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Configuración de la Tienda'),
-          actions: [
-            TextButton.icon(
-              onPressed: _save,
-              icon: const Icon(Icons.save, color: Colors.white),
-              label: const Text('Guardar', style: TextStyle(color: Colors.white)),
-            ),
-          ],
         ),
+        floatingActionButton: _loading
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: _save,
+                icon: const Icon(Icons.save),
+                label: const Text('Guardar'),
+              ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(

@@ -456,14 +456,7 @@ class _ProductsScreenState extends State<ProductsScreen> {
                         child: Text('-$discountPct%', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700)),
                       ),
                     ),
-                  Positioned(
-                    top: 8, right: 8,
-                    child: Container(
-                      width: 30, height: 30,
-                      decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.9), shape: BoxShape.circle),
-                      child: const Icon(Icons.favorite_border_rounded, size: 15, color: AppTheme.textSecondary),
-                    ),
-                  ),
+
                 ],
               ),
             ),
