@@ -1,6 +1,6 @@
 /**
  * Auth Service — Unit Tests
- * Tests: register, login, refresh, me, logout, change-password
+ * Tests: register, verify-email, login, refresh, me, logout, change-password
  */
 const request = require('supertest');
 const express = require('express');
@@ -55,7 +55,7 @@ function makeToken(payload, expiresIn = '1h') {
 // Registration Tests
 // ══════════════════════════════════════
 describe('POST /api/auth/register', () => {
-  it('should register a new user successfully', async () => {
+  it('should register a new user and require email verification', async () => {
     const res = await request(app)
       .post('/api/auth/register')
       .send({
@@ -66,11 +66,10 @@ describe('POST /api/auth/register', () => {
       });
 
     expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('token');
-    expect(res.body).toHaveProperty('refreshToken');
-    expect(res.body.user).toHaveProperty('email', 'test@example.com');
-    expect(res.body.user).not.toHaveProperty('password');
-    expect(res.body.user.role).toBe('client');
+    expect(res.body.requiresVerification).toBe(true);
+    expect(res.body.email).toBe('test@example.com');
+    expect(res.body).not.toHaveProperty('token');
+    expect(res.body).not.toHaveProperty('refreshToken');
   });
 
   it('should reject duplicate email', async () => {
@@ -129,7 +128,58 @@ describe('POST /api/auth/register', () => {
 });
 
 // ══════════════════════════════════════
-// Login Tests
+// Email Verification Tests
+// ══════════════════════════════════════
+describe('POST /api/auth/verify-email', () => {
+  it('should reject an invalid code', async () => {
+    const res = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ email: 'test@example.com', code: '000000' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/inválido|expirado/i);
+  });
+
+  it('should verify email with correct code', async () => {
+    // Get the code directly from the database
+    const user = db.prepare('SELECT verification_code FROM users WHERE email = ?').get('test@example.com');
+    expect(user.verification_code).toBeTruthy();
+
+    const res = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ email: 'test@example.com', code: user.verification_code });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('token');
+    expect(res.body).toHaveProperty('refreshToken');
+    expect(res.body.user.email).toBe('test@example.com');
+    expect(res.body.user).not.toHaveProperty('password');
+  });
+
+  it('should reject verification for already verified email', async () => {
+    const res = await request(app)
+      .post('/api/auth/verify-email')
+      .send({ email: 'test@example.com', code: '123456' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ══════════════════════════════════════
+// Resend Verification Tests
+// ══════════════════════════════════════
+describe('POST /api/auth/resend-verification', () => {
+  it('should always return 200 (no email leak)', async () => {
+    const res = await request(app)
+      .post('/api/auth/resend-verification')
+      .send({ email: 'doesnotexist@example.com' });
+
+    expect(res.status).toBe(200);
+  });
+});
+
+// ══════════════════════════════════════
+// Login Tests (user is now verified)
 // ══════════════════════════════════════
 describe('POST /api/auth/login', () => {
   it('should login successfully with valid credentials', async () => {

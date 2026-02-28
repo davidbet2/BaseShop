@@ -15,6 +15,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthRegisterRequested>(_onRegisterRequested);
     on<AuthGoogleSignInRequested>(_onGoogleSignInRequested);
     on<AuthLogoutRequested>(_onLogoutRequested);
+    on<AuthVerifyEmailRequested>(_onVerifyEmail);
+    on<AuthResendVerificationRequested>(_onResendVerification);
+    on<AuthForgotPasswordRequested>(_onForgotPassword);
+    on<AuthResetPasswordRequested>(_onResetPassword);
   }
 
   Future<void> _onCheckRequested(
@@ -44,6 +48,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = await _repository.login(event.email, event.password);
       emit(AuthAuthenticated(user: user));
     } catch (e) {
+      // Check if login failed because email is not verified
+      if (e is DioException && e.response?.statusCode == 403) {
+        final data = e.response?.data;
+        if (data is Map<String, dynamic> && data['requiresVerification'] == true) {
+          emit(AuthVerificationRequired(
+            email: data['email']?.toString() ?? event.email,
+            message: data['error']?.toString() ?? 'Verifica tu correo electrónico',
+          ));
+          return;
+        }
+      }
       emit(AuthError(message: _extractError(e)));
     }
   }
@@ -54,14 +69,23 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
-      final user = await _repository.register(
+      final result = await _repository.register(
         email: event.email,
         password: event.password,
         firstName: event.firstName,
         lastName: event.lastName,
         phone: event.phone,
       );
-      emit(AuthAuthenticated(user: user));
+
+      // Check if registration requires email verification
+      if (result['requiresVerification'] == true) {
+        emit(AuthVerificationRequired(
+          email: result['email']?.toString() ?? event.email,
+          message: result['message']?.toString() ?? 'Revisa tu correo para verificar tu cuenta.',
+        ));
+      } else {
+        emit(AuthAuthenticated(user: result));
+      }
     } catch (e) {
       emit(AuthError(message: _extractError(e)));
     }
@@ -94,6 +118,60 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       debugPrint('[AuthBloc] Logout error: $e');
     }
     emit(const AuthUnauthenticated());
+  }
+
+  Future<void> _onVerifyEmail(
+    AuthVerifyEmailRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      final user = await _repository.verifyEmail(event.email, event.code);
+      emit(AuthAuthenticated(user: user));
+    } catch (e) {
+      emit(AuthError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onResendVerification(
+    AuthResendVerificationRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    try {
+      await _repository.resendVerification(event.email);
+      emit(AuthVerificationResent(email: event.email));
+    } catch (e) {
+      emit(AuthError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onForgotPassword(
+    AuthForgotPasswordRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _repository.forgotPassword(event.email);
+      emit(AuthResetCodeSent(
+        email: event.email,
+        message: 'Si el correo existe, recibirás un código de recuperación.',
+      ));
+    } catch (e) {
+      emit(AuthError(message: _extractError(e)));
+    }
+  }
+
+  Future<void> _onResetPassword(
+    AuthResetPasswordRequested event,
+    Emitter<AuthState> emit,
+  ) async {
+    emit(const AuthLoading());
+    try {
+      await _repository.resetPassword(event.email, event.code, event.newPassword);
+      emit(const AuthPasswordReset());
+    } catch (e) {
+      emit(AuthError(message: _extractError(e)));
+    }
   }
 
   String _extractError(dynamic e) {

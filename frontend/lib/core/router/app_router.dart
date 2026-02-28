@@ -12,6 +12,8 @@ import 'package:baseshop/features/products/bloc/products_bloc.dart';
 
 import 'package:baseshop/features/auth/screens/login_screen.dart';
 import 'package:baseshop/features/auth/screens/register_screen.dart';
+import 'package:baseshop/features/auth/screens/verify_email_screen.dart';
+import 'package:baseshop/features/auth/screens/forgot_password_screen.dart';
 import 'package:baseshop/features/home/screens/home_screen.dart';
 import 'package:baseshop/features/products/screens/products_screen.dart';
 import 'package:baseshop/features/products/screens/product_detail_screen.dart';
@@ -56,6 +58,7 @@ const _authRequiredPaths = <String>{
 const _authPages = <String>{
   '/login',
   '/register',
+  '/verify-email',
   '/forgot-password',
 };
 
@@ -151,6 +154,17 @@ late final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/register',
       builder: (context, state) => const RegisterScreen(),
+    ),
+    GoRoute(
+      path: '/verify-email',
+      builder: (context, state) {
+        final email = (state.extra as Map<String, dynamic>?)?['email']?.toString() ?? '';
+        return VerifyEmailScreen(email: email);
+      },
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      builder: (context, state) => const ForgotPasswordScreen(),
     ),
 
     // ── Shell (bottom nav / scaffold) ────────────────────────

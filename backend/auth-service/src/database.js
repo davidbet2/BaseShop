@@ -91,6 +91,7 @@ const initDatabase = async () => {
     provider_id TEXT DEFAULT '',
     email_verified INTEGER DEFAULT 0,
     verification_code TEXT DEFAULT '',
+    verification_code_expires TEXT DEFAULT '',
     reset_code TEXT DEFAULT '',
     reset_code_expires TEXT DEFAULT '',
     is_active INTEGER DEFAULT 1,
@@ -107,6 +108,13 @@ const initDatabase = async () => {
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
   )`);
+
+  // ── Migration: add verification_code_expires column if not exists ──
+  try {
+    rawDb.run(`ALTER TABLE users ADD COLUMN verification_code_expires TEXT DEFAULT ''`);
+  } catch (e) {
+    // Column already exists — ignore
+  }
 
   save();
 

@@ -7,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const { getDb } = require('../database');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth');
 const { verifyRecaptcha } = require('../middleware/recaptcha');
+const { generateCode, sendVerificationEmail, sendPasswordResetEmail } = require('../services/brevo');
 
 // C1 fix: fail fast if JWT_SECRET is not set (no hardcoded fallback)
 const JWT_SECRET = process.env.JWT_SECRET || 'baseshop-dev-secret-change-in-production';
@@ -36,7 +37,7 @@ function generateTokens(user) {
 
 // Sanitiza datos del usuario (sin password)
 function sanitizeUser(user) {
-  const { password, verification_code, reset_code, reset_code_expires, ...safe } = user;
+  const { password, verification_code, verification_code_expires, reset_code, reset_code_expires, ...safe } = user;
   return safe;
 }
 
@@ -75,23 +76,116 @@ module.exports = (authLimiter) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const id = uuidv4();
-        const verificationCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+        const verificationCode = generateCode();
+        const verificationExpires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-        db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, phone, role, verification_code)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, email, hashedPassword, first_name, last_name, phone || '', 'client', verificationCode);
+        db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, phone, role, verification_code, verification_code_expires)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, email, hashedPassword, first_name, last_name, phone || '', 'client', verificationCode, verificationExpires);
 
-        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
-        const { token, refreshToken } = generateTokens(user);
+        // Send verification email via Brevo
+        await sendVerificationEmail(email, first_name, verificationCode);
 
         res.status(201).json({
-          token,
-          refreshToken,
-          user: sanitizeUser(user),
-          message: 'Registro exitoso',
+          message: 'Registro exitoso. Revisa tu correo para verificar tu cuenta.',
+          email,
+          requiresVerification: true,
         });
       } catch (error) {
         console.error('[auth] Register error:', error);
         res.status(500).json({ error: 'Error al registrar usuario' });
+      }
+    }
+  );
+
+  // ══════════════════════════════════════
+  // POST /api/auth/verify-email
+  // ══════════════════════════════════════
+  router.post('/verify-email',
+    authLimiter,
+    [
+      body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
+      body('code').isLength({ min: 6, max: 6 }).isNumeric().withMessage('Código de 6 dígitos requerido'),
+    ],
+    async (req, res) => {
+      try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+          return res.status(400).json({ error: errors.array()[0].msg });
+        }
+
+        const { email, code } = req.body;
+        const db = getDb();
+        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+        if (!user || !user.verification_code) {
+          return res.status(400).json({ error: 'Código inválido' });
+        }
+
+        if (user.email_verified) {
+          return res.status(400).json({ error: 'Este correo ya está verificado' });
+        }
+
+        // Timing-safe comparison
+        const codeMatch = user.verification_code.length === code.length &&
+          crypto.timingSafeEqual(Buffer.from(user.verification_code), Buffer.from(code));
+
+        if (!codeMatch) {
+          return res.status(400).json({ error: 'Código inválido' });
+        }
+
+        // Check expiration
+        if (user.verification_code_expires && new Date(user.verification_code_expires) < new Date()) {
+          return res.status(400).json({ error: 'Código expirado. Solicita uno nuevo.' });
+        }
+
+        // Mark as verified
+        db.prepare('UPDATE users SET email_verified = 1, verification_code = "", verification_code_expires = "", updated_at = datetime("now") WHERE id = ?')
+          .run(user.id);
+
+        const verified = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+        const { token, refreshToken } = generateTokens(verified);
+
+        res.json({
+          token,
+          refreshToken,
+          user: sanitizeUser(verified),
+          message: 'Correo verificado exitosamente',
+        });
+      } catch (error) {
+        console.error('[auth] Verify email error:', error);
+        res.status(500).json({ error: 'Error al verificar correo' });
+      }
+    }
+  );
+
+  // ══════════════════════════════════════
+  // POST /api/auth/resend-verification
+  // ══════════════════════════════════════
+  router.post('/resend-verification',
+    authLimiter,
+    [body('email').isEmail().normalizeEmail().withMessage('Email inválido')],
+    async (req, res) => {
+      try {
+        const { email } = req.body;
+        const db = getDb();
+        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+
+        // Always respond 200 to not leak emails
+        if (!user || user.email_verified) {
+          return res.json({ message: 'Si el correo existe y no está verificado, recibirás un nuevo código.' });
+        }
+
+        const newCode = generateCode();
+        const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+        db.prepare('UPDATE users SET verification_code = ?, verification_code_expires = ?, updated_at = datetime("now") WHERE id = ?')
+          .run(newCode, expires, user.id);
+
+        await sendVerificationEmail(email, user.first_name, newCode);
+
+        res.json({ message: 'Si el correo existe y no está verificado, recibirás un nuevo código.' });
+      } catch (error) {
+        console.error('[auth] Resend verification error:', error);
+        res.status(500).json({ error: 'Error al reenviar código' });
       }
     }
   );
@@ -132,6 +226,22 @@ module.exports = (authLimiter) => {
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
           return res.status(401).json({ error: 'Credenciales inválidas' });
+        }
+
+        // Check email verification for non-Google local accounts
+        if (!user.email_verified && user.provider !== 'google') {
+          // Resend verification code
+          const newCode = generateCode();
+          const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+          db.prepare('UPDATE users SET verification_code = ?, verification_code_expires = ?, updated_at = datetime("now") WHERE id = ?')
+            .run(newCode, expires, user.id);
+          await sendVerificationEmail(email, user.first_name, newCode);
+
+          return res.status(403).json({
+            error: 'Debes verificar tu correo electrónico antes de iniciar sesión. Te hemos reenviado el código.',
+            requiresVerification: true,
+            email: user.email,
+          });
         }
 
         const { token, refreshToken } = generateTokens(user);
@@ -352,13 +462,19 @@ module.exports = (authLimiter) => {
           return res.json({ message: 'Si el email existe, recibirás un código de recuperación' });
         }
 
-        const resetCode = crypto.randomBytes(4).toString('hex').toUpperCase();
+        // Google-only accounts can't reset password
+        if (user.provider === 'google' && !user.password) {
+          return res.json({ message: 'Si el email existe, recibirás un código de recuperación' });
+        }
+
+        const resetCode = generateCode();
         const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString(); // 30 min
 
         db.prepare('UPDATE users SET reset_code = ?, reset_code_expires = ?, updated_at = datetime("now") WHERE id = ?')
           .run(resetCode, expires, user.id);
 
-        // L4 fix: don't log reset codes
+        // Send password reset email via Brevo
+        await sendPasswordResetEmail(email, user.first_name, resetCode);
         console.log(`[auth] Reset code generated for ${email}`);
 
         res.json({ message: 'Si el email existe, recibirás un código de recuperación' });
@@ -375,7 +491,7 @@ module.exports = (authLimiter) => {
     authLimiter,
     [
       body('email').isEmail().normalizeEmail(),
-      body('code').notEmpty().withMessage('Código requerido'),
+      body('code').isLength({ min: 6, max: 6 }).isNumeric().withMessage('Código de 6 dígitos requerido'),
       body('newPassword').isLength({ min: 8 }).withMessage('La contraseña debe tener al menos 8 caracteres')
         .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
         .withMessage('La contraseña debe incluir mayúscula, minúscula y número'),
@@ -392,7 +508,8 @@ module.exports = (authLimiter) => {
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
         // H5 fix: use timing-safe comparison for reset code
-        if (!user || !user.reset_code || !crypto.timingSafeEqual(Buffer.from(user.reset_code), Buffer.from(code.toUpperCase().padEnd(user.reset_code.length)))) {
+        if (!user || !user.reset_code || user.reset_code.length !== code.length ||
+            !crypto.timingSafeEqual(Buffer.from(user.reset_code), Buffer.from(code))) {
           return res.status(400).json({ error: 'Código inválido' });
         }
 

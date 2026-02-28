@@ -46,6 +46,8 @@ class _LoginScreenState extends State<LoginScreen> {
           if (state is AuthAuthenticated) {
             final role = (state.user['role']?.toString().toLowerCase() ?? '');
             context.go(role == 'admin' ? '/admin/dashboard' : '/home');
+          } else if (state is AuthVerificationRequired) {
+            context.go('/verify-email', extra: {'email': state.email});
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: AppTheme.errorColor),
@@ -146,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () {},
+                              onPressed: () => context.go('/forgot-password'),
                               style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: const Size(0, 32)),
                               child: Text('¿Olvidaste tu contraseña?', style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.primary)),
                             ),

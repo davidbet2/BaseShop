@@ -32,6 +32,7 @@ class AuthRepository {
   }
 
   // ── Register ───────────────────────────────────────────────
+  /// Returns the response data (may contain requiresVerification flag)
   Future<Map<String, dynamic>> register({
     required String email,
     required String password,
@@ -54,6 +55,12 @@ class AuthRepository {
     );
 
     final data = response.data as Map<String, dynamic>;
+
+    // If registration requires email verification, don't set tokens
+    if (data['requiresVerification'] == true) {
+      return data;
+    }
+
     await _apiClient.setToken(
       data['token']?.toString() ?? '',
       data['refreshToken']?.toString() ?? '',
@@ -153,6 +160,32 @@ class AuthRepository {
         'code': code,
         'newPassword': newPassword,
       },
+    );
+  }
+
+  // ── Verify Email ──────────────────────────────────────────
+  Future<Map<String, dynamic>> verifyEmail(String email, String code) async {
+    final response = await _apiClient.dio.post(
+      ApiConstants.verifyEmail,
+      data: {
+        'email': email,
+        'code': code,
+      },
+    );
+
+    final data = response.data as Map<String, dynamic>;
+    await _apiClient.setToken(
+      data['token']?.toString() ?? '',
+      data['refreshToken']?.toString() ?? '',
+    );
+    return data['user'] as Map<String, dynamic>;
+  }
+
+  // ── Resend Verification ───────────────────────────────────
+  Future<void> resendVerification(String email) async {
+    await _apiClient.dio.post(
+      ApiConstants.resendVerification,
+      data: {'email': email},
     );
   }
 }

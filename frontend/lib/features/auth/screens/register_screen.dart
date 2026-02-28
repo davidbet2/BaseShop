@@ -57,6 +57,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         listener: (context, state) {
           if (state is AuthAuthenticated) {
             context.go('/home');
+          } else if (state is AuthVerificationRequired) {
+            context.go('/verify-email', extra: {'email': state.email});
           } else if (state is AuthError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message), backgroundColor: AppTheme.errorColor),
