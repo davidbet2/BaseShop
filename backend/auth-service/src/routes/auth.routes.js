@@ -68,8 +68,8 @@ module.exports = (authLimiter) => {
         const { email, password, first_name, last_name, phone } = req.body;
         const db = getDb();
 
-        // Verificar email único
-        const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+        // Verificar si ya existe como usuario verificado
+        const existing = db.prepare('SELECT id, email_verified, provider FROM users WHERE email = ?').get(email);
         if (existing) {
           return res.status(400).json({ error: 'Este email ya está registrado' });
         }
@@ -79,8 +79,12 @@ module.exports = (authLimiter) => {
         const verificationCode = generateCode();
         const verificationExpires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
 
-        db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, phone, role, verification_code, verification_code_expires)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, email, hashedPassword, first_name, last_name, phone || '', 'client', verificationCode, verificationExpires);
+        // Remove any previous pending registration for this email
+        db.prepare('DELETE FROM pending_registrations WHERE email = ?').run(email);
+
+        // Insert into pending_registrations (NOT users)
+        db.prepare(`INSERT INTO pending_registrations (id, email, password, first_name, last_name, phone, verification_code, verification_code_expires)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(id, email, hashedPassword, first_name, last_name, phone || '', verificationCode, verificationExpires);
 
         // Send verification email via Brevo
         await sendVerificationEmail(email, first_name, verificationCode);
@@ -115,34 +119,42 @@ module.exports = (authLimiter) => {
 
         const { email, code } = req.body;
         const db = getDb();
-        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
-        if (!user || !user.verification_code) {
-          return res.status(400).json({ error: 'Código inválido' });
-        }
-
-        if (user.email_verified) {
+        // Check if already verified (exists in users table)
+        const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+        if (existingUser) {
           return res.status(400).json({ error: 'Este correo ya está verificado' });
         }
 
+        // Look up in pending_registrations
+        const pending = db.prepare('SELECT * FROM pending_registrations WHERE email = ?').get(email);
+
+        if (!pending || !pending.verification_code) {
+          return res.status(400).json({ error: 'Código inválido' });
+        }
+
+        // Check expiration
+        if (pending.verification_code_expires && new Date(pending.verification_code_expires) < new Date()) {
+          return res.status(400).json({ error: 'Código expirado. Solicita uno nuevo.' });
+        }
+
         // Timing-safe comparison
-        const codeMatch = user.verification_code.length === code.length &&
-          crypto.timingSafeEqual(Buffer.from(user.verification_code), Buffer.from(code));
+        const codeMatch = pending.verification_code.length === code.length &&
+          crypto.timingSafeEqual(Buffer.from(pending.verification_code), Buffer.from(code));
 
         if (!codeMatch) {
           return res.status(400).json({ error: 'Código inválido' });
         }
 
-        // Check expiration
-        if (user.verification_code_expires && new Date(user.verification_code_expires) < new Date()) {
-          return res.status(400).json({ error: 'Código expirado. Solicita uno nuevo.' });
-        }
+        // Code is valid — create the real user
+        const userId = uuidv4();
+        db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, phone, role, email_verified)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(userId, pending.email, pending.password, pending.first_name, pending.last_name, pending.phone || '', 'client', 1);
 
-        // Mark as verified
-        db.prepare('UPDATE users SET email_verified = 1, verification_code = "", verification_code_expires = "", updated_at = datetime("now") WHERE id = ?')
-          .run(user.id);
+        // Remove from pending
+        db.prepare('DELETE FROM pending_registrations WHERE id = ?').run(pending.id);
 
-        const verified = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+        const verified = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
         const { token, refreshToken } = generateTokens(verified);
 
         res.json({
@@ -168,19 +180,19 @@ module.exports = (authLimiter) => {
       try {
         const { email } = req.body;
         const db = getDb();
-        const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
+        const pending = db.prepare('SELECT * FROM pending_registrations WHERE email = ?').get(email);
 
         // Always respond 200 to not leak emails
-        if (!user || user.email_verified) {
+        if (!pending) {
           return res.json({ message: 'Si el correo existe y no está verificado, recibirás un nuevo código.' });
         }
 
         const newCode = generateCode();
         const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-        db.prepare('UPDATE users SET verification_code = ?, verification_code_expires = ?, updated_at = datetime("now") WHERE id = ?')
-          .run(newCode, expires, user.id);
+        db.prepare('UPDATE pending_registrations SET verification_code = ?, verification_code_expires = ? WHERE id = ?')
+          .run(newCode, expires, pending.id);
 
-        await sendVerificationEmail(email, user.first_name, newCode);
+        await sendVerificationEmail(email, pending.first_name, newCode);
 
         res.json({ message: 'Si el correo existe y no está verificado, recibirás un nuevo código.' });
       } catch (error) {
@@ -212,6 +224,15 @@ module.exports = (authLimiter) => {
 
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
         if (!user) {
+          // Check if there's a pending registration
+          const pending = db.prepare('SELECT email FROM pending_registrations WHERE email = ?').get(email);
+          if (pending) {
+            return res.status(403).json({
+              error: 'Debes verificar tu correo electrónico antes de iniciar sesión.',
+              requiresVerification: true,
+              email: pending.email,
+            });
+          }
           return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
@@ -226,22 +247,6 @@ module.exports = (authLimiter) => {
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
           return res.status(401).json({ error: 'Credenciales inválidas' });
-        }
-
-        // Check email verification for non-Google local accounts
-        if (!user.email_verified && user.provider !== 'google') {
-          // Resend verification code
-          const newCode = generateCode();
-          const expires = new Date(Date.now() + 30 * 60 * 1000).toISOString();
-          db.prepare('UPDATE users SET verification_code = ?, verification_code_expires = ?, updated_at = datetime("now") WHERE id = ?')
-            .run(newCode, expires, user.id);
-          await sendVerificationEmail(email, user.first_name, newCode);
-
-          return res.status(403).json({
-            error: 'Debes verificar tu correo electrónico antes de iniciar sesión. Te hemos reenviado el código.',
-            requiresVerification: true,
-            email: user.email,
-          });
         }
 
         const { token, refreshToken } = generateTokens(user);

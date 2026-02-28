@@ -140,7 +140,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             onSubmit: (_) => _submit(),
                             validator: (v) {
                               if (v == null || v.isEmpty) return 'Ingresa tu contrase\u00f1a';
-                              if (v.length < 6) return 'M\u00ednimo 6 caracteres';
+                              if (v.length < 8) return 'Mínimo 8 caracteres';
                               return null;
                             },
                           ),

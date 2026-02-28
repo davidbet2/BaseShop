@@ -72,7 +72,7 @@ describe('POST /api/auth/register', () => {
     expect(res.body).not.toHaveProperty('refreshToken');
   });
 
-  it('should reject duplicate email', async () => {
+  it('should allow re-registration while still pending verification', async () => {
     const res = await request(app)
       .post('/api/auth/register')
       .send({
@@ -82,8 +82,9 @@ describe('POST /api/auth/register', () => {
         last_name: 'User',
       });
 
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/ya está registrado/i);
+    // Replaces the pending record — returns 201 again
+    expect(res.status).toBe(201);
+    expect(res.body.requiresVerification).toBe(true);
   });
 
   it('should reject invalid email', async () => {
@@ -141,13 +142,13 @@ describe('POST /api/auth/verify-email', () => {
   });
 
   it('should verify email with correct code', async () => {
-    // Get the code directly from the database
-    const user = db.prepare('SELECT verification_code FROM users WHERE email = ?').get('test@example.com');
-    expect(user.verification_code).toBeTruthy();
+    // Get the code directly from pending_registrations
+    const pending = db.prepare('SELECT verification_code FROM pending_registrations WHERE email = ?').get('test@example.com');
+    expect(pending.verification_code).toBeTruthy();
 
     const res = await request(app)
       .post('/api/auth/verify-email')
-      .send({ email: 'test@example.com', code: user.verification_code });
+      .send({ email: 'test@example.com', code: pending.verification_code });
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('token');
@@ -162,6 +163,25 @@ describe('POST /api/auth/verify-email', () => {
       .send({ email: 'test@example.com', code: '123456' });
 
     expect(res.status).toBe(400);
+  });
+});
+
+// ══════════════════════════════════════
+// Re-registration after verification should fail
+// ══════════════════════════════════════
+describe('POST /api/auth/register (after verification)', () => {
+  it('should reject registration for an already verified email', async () => {
+    const res = await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'test@example.com',
+        password: 'Test123!',
+        first_name: 'Duplicate',
+        last_name: 'User',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/ya está registrado/i);
   });
 });
 

@@ -286,7 +286,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             ),
             validator: (v) {
               if (v == null || v.isEmpty) return 'Ingresa tu nueva contraseña';
-              if (v.length < 6) return 'Mínimo 6 caracteres';
+              if (v.length < 8) return 'Mínimo 8 caracteres';
               return null;
             },
           ),

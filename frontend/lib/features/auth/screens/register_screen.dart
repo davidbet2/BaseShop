@@ -169,7 +169,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       controller: _passCtrl, obscureText: _obscure1,
                       style: const TextStyle(fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Contrase\u00f1a (m\u00edn. 6 caracteres)',
+                        hintText: 'Contraseña (mín. 8 caracteres)',
                         prefixIcon: const Icon(Icons.lock_outline_rounded, size: 20, color: AppTheme.textSecondary),
                         suffixIcon: IconButton(
                           onPressed: () => setState(() => _obscure1 = !_obscure1),
@@ -183,7 +183,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Requerido';
-                        if (v.length < 6) return 'M\u00ednimo 6 caracteres';
+                        if (v.length < 8) return 'Mínimo 8 caracteres';
                         return null;
                       },
                     ),

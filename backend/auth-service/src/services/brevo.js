@@ -5,7 +5,7 @@
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 
 const BREVO_API_KEY = process.env.BREVO_API_KEY || '';
-const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'noreply@baseshop.com';
+const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL || 'shopbrevosmtp@gmail.com';
 const SENDER_NAME = process.env.BREVO_SENDER_NAME || 'BaseShop';
 
 let apiInstance = null;

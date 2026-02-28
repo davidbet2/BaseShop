@@ -33,7 +33,7 @@ start_service() {
     export ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin123!}"
     export JWT_EXPIRATION="${JWT_EXPIRATION:-24h}"
     export BREVO_API_KEY="${BREVO_API_KEY:-}"
-    export BREVO_SENDER_EMAIL="${BREVO_SENDER_EMAIL:-noreply@baseshop.com}"
+    export BREVO_SENDER_EMAIL="${BREVO_SENDER_EMAIL:-shopbrevosmtp@gmail.com}"
     export BREVO_SENDER_NAME="${BREVO_SENDER_NAME:-BaseShop}"
   fi
 

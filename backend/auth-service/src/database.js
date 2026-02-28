@@ -99,6 +99,19 @@ const initDatabase = async () => {
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
 
+  // ── Tabla de registros pendientes (pre-verificación) ──
+  rawDb.run(`CREATE TABLE IF NOT EXISTS pending_registrations (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    first_name TEXT NOT NULL DEFAULT '',
+    last_name TEXT NOT NULL DEFAULT '',
+    phone TEXT DEFAULT '',
+    verification_code TEXT NOT NULL,
+    verification_code_expires TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+
   // ── Tabla de refresh tokens ──
   rawDb.run(`CREATE TABLE IF NOT EXISTS refresh_tokens (
     id TEXT PRIMARY KEY,
@@ -115,6 +128,9 @@ const initDatabase = async () => {
   } catch (e) {
     // Column already exists — ignore
   }
+
+  // Cleanup expired pending registrations (>30 min)
+  rawDb.run(`DELETE FROM pending_registrations WHERE verification_code_expires < datetime('now')`);
 
   save();
 
