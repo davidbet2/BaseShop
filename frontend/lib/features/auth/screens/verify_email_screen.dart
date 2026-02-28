@@ -17,23 +17,18 @@ class VerifyEmailScreen extends StatefulWidget {
 }
 
 class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
-  final List<TextEditingController> _controllers =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  final TextEditingController _codeCtrl = TextEditingController();
+  final FocusNode _codeFocus = FocusNode();
   bool _resendEnabled = true;
 
   @override
   void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
-    for (final f in _focusNodes) {
-      f.dispose();
-    }
+    _codeCtrl.dispose();
+    _codeFocus.dispose();
     super.dispose();
   }
 
-  String get _code => _controllers.map((c) => c.text).join();
+  String get _code => _codeCtrl.text;
 
   void _submit() {
     final code = _code;
@@ -158,55 +153,87 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 36),
-                        // 6-digit code input
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(6, (i) {
-                            return Container(
-                              width: 48,
-                              height: 56,
-                              margin:
-                                  const EdgeInsets.symmetric(horizontal: 4),
-                              child: TextField(
-                                controller: _controllers[i],
-                                focusNode: _focusNodes[i],
-                                textAlign: TextAlign.center,
-                                keyboardType: TextInputType.number,
-                                maxLength: 1,
-                                style: const TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700),
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                decoration: InputDecoration(
-                                  counterText: '',
-                                  filled: true,
-                                  fillColor: const Color(0xFFF3F4F6),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    borderSide: BorderSide(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary,
-                                        width: 1.5),
+                        // 6-digit code input — single hidden field + visual boxes
+                        GestureDetector(
+                          onTap: () => _codeFocus.requestFocus(),
+                          child: Stack(
+                            children: [
+                              // Hidden real TextField
+                              Opacity(
+                                opacity: 0,
+                                child: SizedBox(
+                                  height: 56,
+                                  child: TextField(
+                                    controller: _codeCtrl,
+                                    focusNode: _codeFocus,
+                                    autofocus: true,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 6,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(6),
+                                    ],
+                                    decoration: const InputDecoration(
+                                      counterText: '',
+                                      border: InputBorder.none,
+                                    ),
+                                    onChanged: (v) {
+                                      setState(() {});
+                                      if (v.length == 6) _submit();
+                                    },
                                   ),
                                 ),
-                                onChanged: (v) {
-                                  if (v.isNotEmpty && i < 5) {
-                                    _focusNodes[i + 1].requestFocus();
-                                  } else if (v.isEmpty && i > 0) {
-                                    _focusNodes[i - 1].requestFocus();
-                                  }
-                                  if (_code.length == 6) _submit();
-                                },
                               ),
-                            );
-                          }),
+                              // Visual digit boxes
+                              IgnorePointer(
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: List.generate(6, (i) {
+                                    final hasChar = i < _codeCtrl.text.length;
+                                    final isFocused = _codeFocus.hasFocus &&
+                                        i == _codeCtrl.text.length;
+                                    return AnimatedContainer(
+                                      duration:
+                                          const Duration(milliseconds: 150),
+                                      width: 48,
+                                      height: 56,
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF3F4F6),
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                        border: Border.all(
+                                          color: isFocused
+                                              ? Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                              : hasChar
+                                                  ? Theme.of(context)
+                                                      .colorScheme
+                                                      .primary
+                                                      .withValues(alpha: 0.4)
+                                                  : Colors.transparent,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        hasChar
+                                            ? _codeCtrl.text[i]
+                                            : '',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                    );
+                                  }),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 28),
                         // Verify button

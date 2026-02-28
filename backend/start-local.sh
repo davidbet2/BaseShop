@@ -32,10 +32,7 @@ start_service() {
     export ADMIN_EMAIL="${ADMIN_EMAIL:-admin@baseshop.com}"
     export ADMIN_PASSWORD="${ADMIN_PASSWORD:-Admin123!}"
     export JWT_EXPIRATION="${JWT_EXPIRATION:-24h}"
-    export BREVO_SMTP_USER="${BREVO_SMTP_USER:-}"
-    export BREVO_SMTP_PASS="${BREVO_SMTP_PASS:-}"
-    export BREVO_SENDER_EMAIL="${BREVO_SENDER_EMAIL:-shopbrevosmtp@gmail.com}"
-    export BREVO_SENDER_NAME="${BREVO_SENDER_NAME:-BaseShop}"
+    # BREVO SMTP creds loaded from auth-service/.env via dotenv
   fi
 
   if [ "$name" = "payments-service" ]; then
