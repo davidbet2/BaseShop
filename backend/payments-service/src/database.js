@@ -14,8 +14,9 @@ class Statement {
   }
   run(...params) {
     this._rawDb.run(this._sql, params.length === 1 && typeof params[0] === 'object' ? params[0] : params);
+    const changes = this._rawDb.getRowsModified();
     save();
-    return { changes: this._rawDb.getRowsModified() };
+    return { changes };
   }
   get(...params) {
     const stmt = this._rawDb.prepare(this._sql);
