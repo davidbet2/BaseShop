@@ -33,12 +33,20 @@ services:
     environment:
       - PORT=3001
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
-      - JWT_EXPIRATION=24h
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-24h}
       - DB_PATH=/app/data/auth.db
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@baseshop.com}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:9090,http://localhost:8080,http://localhost:3000}
-      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:?Set RECAPTCHA_SECRET_KEY in .env}
+      - RECAPTCHA_SECRET_KEY=${RECAPTCHA_SECRET_KEY:-}
+      - RECAPTCHA_THRESHOLD=${RECAPTCHA_THRESHOLD:-0.5}
+      - MOBILE_APP_SECRET=${MOBILE_APP_SECRET:-}
+      - BREVO_SMTP_HOST=${BREVO_SMTP_HOST:-smtp-relay.brevo.com}
+      - BREVO_SMTP_PORT=${BREVO_SMTP_PORT:-587}
+      - BREVO_SMTP_USER=${BREVO_SMTP_USER:-}
+      - BREVO_SMTP_PASS=${BREVO_SMTP_PASS:-}
+      - BREVO_SENDER_EMAIL=${BREVO_SENDER_EMAIL:-noreply@baseshop.dev}
+      - BREVO_SENDER_NAME=${BREVO_SENDER_NAME:-BaseShop}
     volumes: [auth-data:/app/data]
     networks: [baseshop-network]
     restart: unless-stopped

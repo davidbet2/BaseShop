@@ -6,7 +6,9 @@ console.log('[orders-service] Process starting... PID:', process.pid);
 process.on('uncaughtException', (err) => { console.error('UNCAUGHT:', err); process.exit(1); });
 process.on('unhandledRejection', (err) => { console.error('UNHANDLED:', err); process.exit(1); });
 
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+require('dotenv').config(); // override with local .env if present
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');

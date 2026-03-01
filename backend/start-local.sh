@@ -3,14 +3,26 @@
 # BaseShop - Start all services locally
 # ============================================
 
-if [ -z "$JWT_SECRET" ]; then
-  echo "FATAL: JWT_SECRET environment variable is required. Set it before running this script."
+BACKEND_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Load centralized .env file
+ENV_FILE="$BACKEND_DIR/.env"
+if [ -f "$ENV_FILE" ]; then
+  echo "Loading environment from $ENV_FILE"
+  set -a
+  source "$ENV_FILE"
+  set +a
+else
+  echo "WARNING: $ENV_FILE not found. Copy .env.example to .env and fill in values."
+  echo "  cp $BACKEND_DIR/.env.example $BACKEND_DIR/.env"
+fi
+
+# Validate required variables
+if [ -z "$JWT_SECRET" ] || [ "$JWT_SECRET" = "CHANGE_ME_use_64_chars_minimum" ]; then
+  echo "FATAL: JWT_SECRET is required and must be changed from the placeholder."
   exit 1
 fi
-export JWT_SECRET
 export ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-http://localhost:9090,http://localhost:8080,http://localhost:3000}"
-
-BACKEND_DIR="$(cd "$(dirname "$0")" && pwd)"
 PIDS=()
 
 cleanup() {

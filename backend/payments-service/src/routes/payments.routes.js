@@ -20,8 +20,11 @@ function handleValidation(req, res) {
 
 // PayU Configuration — credentials must be provided via environment variables
 if (!process.env.PAYU_API_KEY || !process.env.PAYU_API_LOGIN || !process.env.PAYU_MERCHANT_ID || !process.env.PAYU_ACCOUNT_ID) {
-  console.error('FATAL: PAYU_API_KEY, PAYU_API_LOGIN, PAYU_MERCHANT_ID, and PAYU_ACCOUNT_ID environment variables are required');
-  process.exit(1);
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: PAYU_API_KEY, PAYU_API_LOGIN, PAYU_MERCHANT_ID, and PAYU_ACCOUNT_ID environment variables are required');
+    process.exit(1);
+  }
+  console.warn('[payments-service] PayU credentials not set — payment processing will not work');
 }
 const PAYU_API_KEY = () => process.env.PAYU_API_KEY;
 const PAYU_API_LOGIN = () => process.env.PAYU_API_LOGIN;
