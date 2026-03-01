@@ -44,7 +44,7 @@ const verifyRecaptcha = async (req, res, next) => {
     console.error('[reCAPTCHA] Google verification failed (network error):', error.message);
     return res.status(503).json({
       success: false,
-      message: 'Security verification temporarily unavailable. Please try again.'
+      message: 'Verificación de seguridad temporalmente no disponible. Intenta de nuevo.'
     });
   }
 };

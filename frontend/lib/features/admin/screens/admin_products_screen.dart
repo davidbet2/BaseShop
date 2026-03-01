@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart' as dio_pkg;
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 
+import 'package:baseshop/core/utils/image_compressor.dart';
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/network/api_client.dart';
 import 'package:baseshop/core/theme/app_theme.dart';
@@ -33,6 +34,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
 
   // ── Multi-select state ─────────────────────────────────────
   bool _selectMode = false;
+  bool _bulkDeleting = false;
   final Set<String> _selectedProductIds = {};
   final Set<String> _selectedCategoryIds = {};
 
@@ -119,15 +121,40 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
     );
     if (ok != true) return;
 
-    for (final id in _selectedProductIds) {
+    setState(() {
+      _bulkDeleting = true;
+      _selectMode = false;
+    });
+
+    int deleted = 0;
+    int failed = 0;
+    final totalOps = _selectedProductIds.length + _selectedCategoryIds.length;
+
+    for (final id in List.of(_selectedProductIds)) {
       _bloc.add(DeleteProduct(productId: id));
+      // Give bloc time to process each event
+      await Future.delayed(const Duration(milliseconds: 100));
+      deleted++;
     }
-    for (final id in _selectedCategoryIds) {
+    for (final id in List.of(_selectedCategoryIds)) {
       _bloc.add(DeleteCategory(categoryId: id));
+      await Future.delayed(const Duration(milliseconds: 100));
+      deleted++;
+    }
+
+    // Wait for last event to settle
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$totalOps elemento${totalOps > 1 ? 's' : ''} eliminado${totalOps > 1 ? 's' : ''}')),
+      );
+      _refresh();
     }
 
     setState(() {
-      _selectMode = false;
+      _bulkDeleting = false;
       _selectedProductIds.clear();
       _selectedCategoryIds.clear();
     });
@@ -212,6 +239,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
             onRefresh: () async => _refresh(),
             child: BlocConsumer<ProductsBloc, ProductsState>(
         listener: (context, state) {
+          if (_bulkDeleting) return; // Suppress individual alerts during bulk delete
           if (state is ProductActionSuccess) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.message)),
@@ -392,6 +420,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                                   width: 48,
                                   height: 48,
                                   fit: BoxFit.cover,
+                                  placeholder: (_, __) => _imgPlaceholder(48),
                                   errorWidget: (_, __, ___) => _imgPlaceholder(48),
                                 )
                               : _imgPlaceholder(48),
@@ -542,6 +571,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
+                          placeholder: (_, __) => _imgPlaceholder(60),
                           errorWidget: (_, __, ___) => _imgPlaceholder(60),
                         )
                       : _imgPlaceholder(60),
@@ -649,6 +679,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
                       ? CachedNetworkImage(
                           imageUrl: img,
                           fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: Colors.grey.shade100,
+                            child: const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+                          ),
                           errorWidget: (_, __, ___) => Container(
                             color: Colors.grey.shade100,
                             child: Icon(Icons.image_outlined, size: 48, color: Colors.grey.shade400),
@@ -2160,11 +2194,19 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
       final picker = ImagePicker();
       final picked = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1200,
-        maxHeight: 1200,
-        imageQuality: 80,
+        // On web, skip resize params to avoid blob revocation issues
+        maxWidth: kIsWeb ? null : 1200,
+        maxHeight: kIsWeb ? null : 1200,
+        imageQuality: kIsWeb ? null : 80,
       );
       if (picked == null) return null;
+
+      // Read bytes immediately before the blob URL can be revoked
+      var bytes = await picked.readAsBytes();
+      if (bytes.isEmpty) return null;
+
+      // Compress image on web (canvas resize + JPEG quality)
+      bytes = await compressImageBytes(bytes, maxWidth: 1200, maxHeight: 1200, quality: 80);
 
       // Show loading indicator
       if (mounted) {
@@ -2182,19 +2224,10 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
 
       final apiClient = getIt<ApiClient>();
 
-      dio_pkg.MultipartFile multipartFile;
-      if (kIsWeb) {
-        final bytes = await picked.readAsBytes();
-        multipartFile = dio_pkg.MultipartFile.fromBytes(
-          bytes,
-          filename: picked.name,
-        );
-      } else {
-        multipartFile = await dio_pkg.MultipartFile.fromFile(
-          picked.path,
-          filename: picked.name,
-        );
-      }
+      final multipartFile = dio_pkg.MultipartFile.fromBytes(
+        bytes,
+        filename: picked.name.isNotEmpty ? picked.name : 'image.jpg',
+      );
 
       final formData = dio_pkg.FormData.fromMap({
         'image': multipartFile,

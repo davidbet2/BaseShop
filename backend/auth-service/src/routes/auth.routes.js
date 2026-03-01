@@ -463,18 +463,13 @@ module.exports = (authLimiter) => {
         const db = getDb();
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
-        const genericResponse = {
-          success: true,
-          message: 'If an account exists with that email, a verification code has been sent.'
-        };
-
         if (!user) {
-          return res.json(genericResponse);
+          return res.json({ sent: false, message: 'No existe una cuenta con ese correo electrónico' });
         }
 
         // Google-only accounts can't reset password
         if (user.provider === 'google' && !user.password) {
-          return res.json(genericResponse);
+          return res.json({ sent: false, message: 'Esta cuenta usa inicio de sesión con Google. No se puede restablecer la contraseña.' });
         }
 
         const resetCode = generateCode();
@@ -487,7 +482,7 @@ module.exports = (authLimiter) => {
         await sendPasswordResetEmail(email, user.first_name, resetCode);
         console.log(`[auth] Reset code generated for ${email}`);
 
-        res.json(genericResponse);
+        res.json({ sent: true, message: 'Te hemos enviado un código de recuperación a tu correo' });
       } catch (error) {
         res.status(500).json({ error: 'Error al procesar solicitud' });
       }

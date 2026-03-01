@@ -495,7 +495,7 @@ router.post('/validate-response', [
         console.warn('[payments-service] Invalid PayU response signature. Expected:', expectedSignature, 'Got:', signature);
         return res.status(403).json({
           success: false,
-          message: 'Invalid payment signature'
+          message: 'Firma de pago inválida'
         });
       }
     }

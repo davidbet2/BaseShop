@@ -26,6 +26,8 @@ app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
+  crossOriginOpenerPolicy: false,   // Permitir popup de Google Sign-In
+  strictTransportSecurity: false,   // Desactivar HSTS (rompe http://localhost)
 }));
 
 // ── CORS con whitelist ──

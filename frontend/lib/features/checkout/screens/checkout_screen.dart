@@ -172,7 +172,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       return OutlinedButton.icon(
                         onPressed: () async {
                           await context.push('/addresses');
-                          _loadAddresses();
+                          await _loadAddresses();
+                          if (_addresses.isNotEmpty && _selectedAddressIndex >= 0) {
+                            _goToStep(1);
+                          }
                         },
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Agregar dirección'),
@@ -248,7 +251,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ElevatedButton.icon(
             onPressed: () async {
               await context.push('/addresses');
-              _loadAddresses();
+              await _loadAddresses();
+              if (_addresses.isNotEmpty && _selectedAddressIndex >= 0) {
+                _goToStep(1);
+              }
             },
             icon: const Icon(Icons.add_rounded),
             label: const Text('Agregar dirección'),

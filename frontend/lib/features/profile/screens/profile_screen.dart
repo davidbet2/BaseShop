@@ -101,7 +101,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   // Account section
                   _buildSection('Cuenta', [
                     _buildMenuItem(Icons.person_outline_rounded, 'Editar perfil', () => _showEditProfileDialog(user)),
-                    _buildMenuItem(Icons.lock_outline_rounded, 'Cambiar contrase\u00f1a', () => _showChangePasswordDialog()),
+                    if (user['provider'] != 'google')
+                      _buildMenuItem(Icons.lock_outline_rounded, 'Cambiar contrase\u00f1a', () => _showChangePasswordDialog()),
                   ]),
 
                   const SizedBox(height: 14),

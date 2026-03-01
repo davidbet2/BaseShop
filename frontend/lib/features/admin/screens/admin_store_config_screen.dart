@@ -1,5 +1,6 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:baseshop/core/utils/image_compressor.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -125,18 +126,15 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
     }
   }
 
-  /// Upload an image file to the backend and return its URL.
-  Future<String?> _uploadImage(XFile xfile) async {
+  /// Upload image bytes to the backend and return its URL.
+  Future<String?> _uploadImageBytes(Uint8List bytes, String filename) async {
     try {
       final apiClient = getIt<ApiClient>();
 
-      dio_pkg.MultipartFile multipartFile;
-      if (kIsWeb) {
-        final bytes = await xfile.readAsBytes();
-        multipartFile = dio_pkg.MultipartFile.fromBytes(bytes, filename: xfile.name);
-      } else {
-        multipartFile = await dio_pkg.MultipartFile.fromFile(xfile.path, filename: xfile.name);
-      }
+      final multipartFile = dio_pkg.MultipartFile.fromBytes(
+        bytes,
+        filename: filename.isNotEmpty ? filename : 'image.jpg',
+      );
 
       final formData = dio_pkg.FormData.fromMap({'image': multipartFile});
       final response = await apiClient.dio.post('/products/upload', data: formData);
@@ -157,10 +155,27 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
     }
   }
 
+  /// Pick image and immediately read bytes before blob can be revoked.
+  Future<String?> _pickAndUpload({double? maxWidth}) async {
+    final xfile = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: kIsWeb ? null : maxWidth,
+      imageQuality: kIsWeb ? null : 80,
+    );
+    if (xfile == null) return null;
+    // Read bytes IMMEDIATELY to avoid blob revocation on web
+    var bytes = await xfile.readAsBytes();
+    if (bytes.isEmpty) return null;
+
+    // Compress image on web (canvas resize + JPEG quality)
+    final mw = (maxWidth ?? 1200).toInt();
+    bytes = await compressImageBytes(bytes, maxWidth: mw, maxHeight: mw, quality: 80);
+
+    return _uploadImageBytes(bytes, xfile.name);
+  }
+
   Future<void> _pickLogo() async {
-    final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 512, imageQuality: 85);
-    if (xfile == null) return;
-    final url = await _uploadImage(xfile);
+    final url = await _pickAndUpload(maxWidth: 512);
     if (url != null) {
       setState(() => _logoPath = url);
     }
@@ -318,12 +333,6 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
           child: const Icon(Icons.broken_image),
         ),
       );
-    }
-    if (!kIsWeb) {
-      final file = File(_logoPath);
-      if (file.existsSync()) {
-        return Image.file(file, width: size, height: size, fit: BoxFit.contain);
-      }
     }
     return Container(
       width: size, height: size,
@@ -592,12 +601,6 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
         ),
       );
     }
-    if (!kIsWeb) {
-      final file = File(path);
-      if (file.existsSync()) {
-        return Image.file(file, width: w, height: h, fit: BoxFit.cover);
-      }
-    }
     return Container(
       width: w, height: h, color: Colors.grey.shade200,
       child: const Icon(Icons.broken_image, size: 18),
@@ -655,9 +658,7 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                             icon: const Icon(Icons.upload_file, size: 18),
                             label: const Text('Subir imagen'),
                             onPressed: () async {
-                              final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1920, imageQuality: 80);
-                              if (xfile == null) return;
-                              final url = await _uploadImage(xfile);
+                              final url = await _pickAndUpload(maxWidth: 1920);
                               if (url != null) {
                                 ss(() {
                                   pickedImagePath = url;
@@ -793,9 +794,7 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
                             icon: const Icon(Icons.upload_file, size: 18),
                             label: const Text('Subir imagen'),
                             onPressed: () async {
-                              final xfile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 1920, imageQuality: 80);
-                              if (xfile == null) return;
-                              final url = await _uploadImage(xfile);
+                              final url = await _pickAndUpload(maxWidth: 1920);
                               if (url != null) {
                                 ss(() {
                                   pickedImagePath = url;

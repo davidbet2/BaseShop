@@ -19,7 +19,7 @@ const app = express();
 const PORT = process.env.PORT || 3009;
 
 // ── Helmet ──
-app.use(helmet());
+app.use(helmet({ strictTransportSecurity: false }));
 
 // ── CORS con whitelist ──
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:9090,http://localhost:8080,http://localhost:3000').split(',').map(o => o.trim());

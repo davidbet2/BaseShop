@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode, debugPrint;
 import 'package:baseshop/core/constants/api_constants.dart';
 import 'package:baseshop/core/network/api_client.dart';
 
@@ -5,6 +6,63 @@ class OrdersRepository {
   final ApiClient _apiClient;
 
   OrdersRepository(this._apiClient);
+
+  /// Enrich order items that have empty product_image by fetching from products API.
+  Future<void> _enrichOrderImages(List<dynamic> orders) async {
+    // Collect all product IDs missing images across all orders
+    final missingIds = <String>{};
+    for (final order in orders) {
+      if (order is! Map<String, dynamic>) continue;
+      final items = order['items'];
+      if (items is! List) continue;
+      for (final item in items) {
+        if (item is! Map<String, dynamic>) continue;
+        final img = (item['product_image'] ?? item['productImage'] ?? '').toString();
+        if (img.isEmpty) {
+          final pid = (item['product_id'] ?? item['productId'] ?? '').toString();
+          if (pid.isNotEmpty) missingIds.add(pid);
+        }
+      }
+    }
+    if (missingIds.isEmpty) return;
+
+    // Fetch images
+    final imageMap = <String, String>{};
+    for (final pid in missingIds) {
+      try {
+        final resp = await _apiClient.dio.get('${ApiConstants.products}/$pid');
+        final pData = resp.data;
+        final product = pData is Map<String, dynamic>
+            ? (pData['data'] is Map<String, dynamic> ? pData['data'] : pData)
+            : null;
+        if (product != null) {
+          final images = product['images'];
+          if (images is List && images.isNotEmpty) {
+            imageMap[pid] = images.first.toString();
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('[OrdersRepo] Failed to fetch image for $pid: $e');
+      }
+    }
+
+    // Apply found images
+    for (final order in orders) {
+      if (order is! Map<String, dynamic>) continue;
+      final items = order['items'];
+      if (items is! List) continue;
+      for (final item in items) {
+        if (item is! Map<String, dynamic>) continue;
+        final img = (item['product_image'] ?? item['productImage'] ?? '').toString();
+        if (img.isEmpty) {
+          final pid = (item['product_id'] ?? item['productId'] ?? '').toString();
+          if (imageMap.containsKey(pid)) {
+            item['product_image'] = imageMap[pid];
+          }
+        }
+      }
+    }
+  }
 
   /// Fetch the current user's orders with optional filters.
   Future<Map<String, dynamic>> getMyOrders({
@@ -26,8 +84,10 @@ class OrdersRepository {
     );
 
     final data = response.data;
+    final ordersList = data['data'] ?? data['orders'] ?? [];
+    await _enrichOrderImages(ordersList is List ? ordersList : []);
     return {
-      'data': data['data'] ?? data['orders'] ?? [],
+      'data': ordersList,
       'total': data['pagination']?['total'] ?? data['total'] ?? 0,
       'page': data['pagination']?['page'] ?? data['page'] ?? page,
     };
@@ -57,8 +117,10 @@ class OrdersRepository {
     );
 
     final data = response.data;
+    final ordersList = data['data'] ?? data['orders'] ?? [];
+    await _enrichOrderImages(ordersList is List ? ordersList : []);
     return {
-      'data': data['data'] ?? data['orders'] ?? [],
+      'data': ordersList,
       'total': data['pagination']?['total'] ?? data['total'] ?? 0,
       'page': data['pagination']?['page'] ?? data['page'] ?? page,
     };
@@ -77,10 +139,11 @@ class OrdersRepository {
       '${ApiConstants.myOrders}/$orderId',
     );
     final data = response.data;
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      return Map<String, dynamic>.from(data['data']);
-    }
-    return Map<String, dynamic>.from(data);
+    final order = data is Map<String, dynamic> && data.containsKey('data')
+        ? Map<String, dynamic>.from(data['data'])
+        : Map<String, dynamic>.from(data);
+    await _enrichOrderImages([order]);
+    return order;
   }
 
   /// Fetch any order detail (admin).
@@ -89,10 +152,11 @@ class OrdersRepository {
       '${ApiConstants.orders}/$orderId',
     );
     final data = response.data;
-    if (data is Map<String, dynamic> && data.containsKey('data')) {
-      return Map<String, dynamic>.from(data['data']);
-    }
-    return Map<String, dynamic>.from(data);
+    final order = data is Map<String, dynamic> && data.containsKey('data')
+        ? Map<String, dynamic>.from(data['data'])
+        : Map<String, dynamic>.from(data);
+    await _enrichOrderImages([order]);
+    return order;
   }
 
   /// Update order status (admin).

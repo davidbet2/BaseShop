@@ -170,14 +170,23 @@ class _CartScreenState extends State<CartScreen> {
               borderRadius: BorderRadius.circular(12),
               child: SizedBox(
                 width: 80, height: 80,
-                child: CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  fit: BoxFit.cover,
-                  errorWidget: (_, __, ___) => Container(
-                    color: const Color(0xFFF3F4F6),
-                    child: const Icon(Icons.image_outlined, size: 28, color: AppTheme.textSecondary),
-                  ),
-                ),
+                child: imageUrl.isEmpty
+                    ? Container(
+                        color: const Color(0xFFF3F4F6),
+                        child: const Icon(Icons.image_outlined, size: 28, color: AppTheme.textSecondary),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: const Color(0xFFF3F4F6),
+                          child: const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: const Color(0xFFF3F4F6),
+                          child: const Icon(Icons.image_outlined, size: 28, color: AppTheme.textSecondary),
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 12),
