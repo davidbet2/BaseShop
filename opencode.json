@@ -1,0 +1,79 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "github-copilot/claude-sonnet-4",
+  "agent": {
+    "build": {
+      "mode": "primary",
+      "description": "Implementacion general: features, bug fixes, refactors multi-archivo",
+      "model": "github-copilot/claude-sonnet-4",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "glob": true,
+        "grep": true,
+        "webfetch": true
+      }
+    },
+    "plan": {
+      "mode": "primary",
+      "description": "Analisis, planificacion y code review sin hacer cambios",
+      "model": "github-copilot/claude-sonnet-4",
+      "tools": {
+        "write": false,
+        "edit": false
+      }
+    },
+    "heavy": {
+      "mode": "primary",
+      "description": "Tareas complejas: arquitectura, security audits, debugging dificil, decisiones de diseno criticas",
+      "model": "github-copilot/claude-opus-4",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "glob": true,
+        "grep": true,
+        "webfetch": true
+      }
+    },
+    "explore": {
+      "mode": "subagent",
+      "description": "Busqueda rapida en codebase: encontrar archivos, buscar patrones, responder preguntas sobre el codigo. Read-only.",
+      "model": "github-copilot/gpt-4o-mini",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": false
+      }
+    },
+    "quick-edit": {
+      "mode": "subagent",
+      "description": "Ediciones simples y rapidas: renombrar variables, agregar comments, formatear, cambios triviales en 1-2 archivos",
+      "model": "github-copilot/gpt-4o-mini",
+      "steps": 10,
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": false,
+        "webfetch": false
+      }
+    },
+    "general": {
+      "mode": "subagent",
+      "description": "Sub-agente general para tareas multi-paso delegadas por el agente principal",
+      "model": "github-copilot/claude-sonnet-4",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "bash": true,
+        "glob": true,
+        "grep": true
+      }
+    }
+  }
+}
