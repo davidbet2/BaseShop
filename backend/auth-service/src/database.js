@@ -145,6 +145,17 @@ const initDatabase = async () => {
     console.log(`[auth-service] Admin user created: ${adminEmail}`);
   }
 
+  // ── Seed: usuario cliente de prueba ──
+  const clientEmail = 'cliente@test.com';
+  const clientPassword = 'Cliente123!';
+  const existingClient = db.prepare('SELECT id FROM users WHERE email = ?').get(clientEmail);
+  if (!existingClient) {
+    const hashedClientPassword = await bcrypt.hash(clientPassword, 10);
+    db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, role, email_verified)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(uuidv4(), clientEmail, hashedClientPassword, 'Cliente', 'Test', 'client', 1);
+    console.log(`[auth-service] Test client user created: ${clientEmail}`);
+  }
+
   // Auto-save cada 5 segundos
   setInterval(save, 5000);
 

@@ -147,15 +147,16 @@ class AuthRepository {
   }
 
   // ── Forgot Password ───────────────────────────────────────
-  Future<void> forgotPassword(String email) async {
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
     final recaptchaToken = await RecaptchaService.execute('forgot_password');
-    await _apiClient.dio.post(
+    final response = await _apiClient.dio.post(
       ApiConstants.forgotPassword,
       data: {
         'email': email,
         'recaptchaToken': recaptchaToken,
       },
     );
+    return response.data is Map ? Map<String, dynamic>.from(response.data) : {};
   }
 
   // ── Reset Password ────────────────────────────────────────

@@ -151,11 +151,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     emit(const AuthLoading());
     try {
-      await _repository.forgotPassword(event.email);
-      emit(AuthResetCodeSent(
-        email: event.email,
-        message: 'Si el correo existe, recibirás un código de recuperación.',
-      ));
+      final result = await _repository.forgotPassword(event.email);
+      final sent = result['sent'] == true;
+      final message = result['message'] as String? ?? '';
+      if (sent) {
+        emit(AuthResetCodeSent(
+          email: event.email,
+          message: message,
+        ));
+      } else {
+        emit(AuthError(message: message.isNotEmpty ? message : 'No se pudo enviar el código'));
+      }
     } catch (e) {
       emit(AuthError(message: _extractError(e)));
     }
