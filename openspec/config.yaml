@@ -1,0 +1,35 @@
+schema: spec-driven
+
+context: |
+  Tech stack: Flutter (frontend), Node.js/Express (backend microservices), Firebase
+  Architecture: Microservices (auth, users, products, orders, cart, payments, favorites, reviews, config, api-gateway)
+  Testing: flutter_test, mocktail, bloc_test, Jest, supertest, Playwright
+  State Management: flutter_bloc
+
+project_skills:
+  - nodejs-microservices     # Express patterns, auth middleware, sql.js
+  - express-testing          # Jest + supertest patterns for APIs
+  - firebase-flutter         # Firebase Core, Messaging, Google Sign-In
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Identify affected services/modules
+  specs:
+    - Use Given/When/Then format for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+  tasks:
+    - Group tasks by phase (infrastructure, implementation, testing)
+    - Use hierarchical numbering (1.1, 1.2, etc.)
+    - Keep tasks small enough to complete in one session
+  apply:
+    - Follow existing code patterns and conventions
+    - Load relevant coding skills for Flutter/Node.js stack
+  verify:
+    - Run tests if test infrastructure exists
+    - Compare implementation against every spec scenario
+  archive:
+    - Warn before merging destructive deltas (large removals)
