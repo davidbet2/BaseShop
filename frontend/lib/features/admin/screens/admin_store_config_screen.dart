@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -152,7 +152,7 @@ class _AdminStoreConfigScreenState extends State<AdminStoreConfigScreen> {
       }
       return null;
     } catch (e) {
-      debugPrint('Upload error: $e');
+      if (kDebugMode) debugPrint('Upload error: $e');
       return null;
     }
   }

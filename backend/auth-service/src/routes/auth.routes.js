@@ -10,10 +10,11 @@ const { verifyRecaptcha } = require('../middleware/recaptcha');
 const { generateCode, sendVerificationEmail, sendPasswordResetEmail } = require('../services/brevo');
 
 // C1 fix: fail fast if JWT_SECRET is not set (no hardcoded fallback)
-const JWT_SECRET = process.env.JWT_SECRET || 'baseshop-dev-secret-change-in-production';
 if (!process.env.JWT_SECRET) {
-  console.warn('[auth] ⚠️  WARNING: JWT_SECRET not set — using insecure default. Set JWT_SECRET env var in production!');
+  console.error('FATAL: JWT_SECRET environment variable is required');
+  process.exit(1);
 }
+const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_EXPIRATION = process.env.JWT_EXPIRATION || '24h';
 const REFRESH_EXPIRATION_DAYS = 30;
 
@@ -462,13 +463,18 @@ module.exports = (authLimiter) => {
         const db = getDb();
         const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email);
 
+        const genericResponse = {
+          success: true,
+          message: 'If an account exists with that email, a verification code has been sent.'
+        };
+
         if (!user) {
-          return res.json({ sent: false, message: 'No existe una cuenta con ese correo electrónico' });
+          return res.json(genericResponse);
         }
 
         // Google-only accounts can't reset password
         if (user.provider === 'google' && !user.password) {
-          return res.json({ sent: false, message: 'Esta cuenta usa inicio de sesión con Google. No se puede restablecer la contraseña.' });
+          return res.json(genericResponse);
         }
 
         const resetCode = generateCode();
@@ -481,7 +487,7 @@ module.exports = (authLimiter) => {
         await sendPasswordResetEmail(email, user.first_name, resetCode);
         console.log(`[auth] Reset code generated for ${email}`);
 
-        res.json({ sent: true, message: 'Te hemos enviado un código de recuperación a tu correo' });
+        res.json(genericResponse);
       } catch (error) {
         res.status(500).json({ error: 'Error al procesar solicitud' });
       }

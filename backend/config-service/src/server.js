@@ -9,10 +9,15 @@ process.on('unhandledRejection', (err) => { console.error('UNHANDLED:', err); pr
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const { initDatabase } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3009;
+
+// ── Helmet ──
+app.use(helmet());
 
 // ── CORS con whitelist ──
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:9090,http://localhost:8080,http://localhost:3000').split(',').map(o => o.trim());
@@ -30,6 +35,16 @@ app.options('*', cors());
 
 // ── Body parser ──
 app.use(express.json({ limit: '10mb' }));
+
+// ── Rate limiting ──
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' }
+});
+app.use(limiter);
 
 // ── UTF-8 en JSON ──
 app.use((req, res, next) => {

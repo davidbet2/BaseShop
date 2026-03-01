@@ -69,12 +69,25 @@ app.use((req, res, next) => {
 });
 
 // ── XSS Sanitization ──
+function sanitizeInput(input) {
+  if (typeof input !== 'string') return input;
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .replace(/data:/gi, 'data-blocked:');
+}
 app.use((req, res, next) => {
   if (req.body && typeof req.body === 'object') {
     const sanitize = (obj) => {
       for (const key of Object.keys(obj)) {
         if (typeof obj[key] === 'string') {
-          obj[key] = obj[key].replace(/<[^>]*>/g, '').trim();
+          obj[key] = sanitizeInput(obj[key]).trim();
         } else if (typeof obj[key] === 'object' && obj[key] !== null) {
           sanitize(obj[key]);
         }

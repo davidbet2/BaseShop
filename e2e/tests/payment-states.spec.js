@@ -29,12 +29,12 @@ const crypto = require('crypto');
 const FRONTEND = 'http://localhost:8080';
 const API = 'http://localhost:3000/api';
 const ORDERS_DIRECT = 'http://localhost:3005';
-const USER_EMAIL = 'cliente@test.com';
-const USER_PASSWORD = 'Cliente123!';
+const USER_EMAIL = process.env.TEST_USER_EMAIL || 'cliente@test.com';
+const USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'Cliente123!';
 
 // PayU sandbox credentials
-const PAYU_API_KEY = '4Vj8eK4rloUd272L48hsrarnUA';
-const PAYU_MERCHANT_ID = '508029';
+const PAYU_API_KEY = process.env.TEST_PAYU_API_KEY || '4Vj8eK4rloUd272L48hsrarnUA';
+const PAYU_MERCHANT_ID = process.env.TEST_PAYU_MERCHANT_ID || '508029';
 
 /**
  * @typedef {Object} PaymentStateTestCase

@@ -48,7 +48,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       try {
         categories = await _repository.getCategories();
       } catch (_) {
-        debugPrint('[ProductsBloc] Categories load skipped');
+        if (kDebugMode) debugPrint('[ProductsBloc] Categories load skipped');
       }
 
       emit(ProductsLoaded(
@@ -58,7 +58,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
         categories: categories,
       ));
     } catch (e) {
-      debugPrint('[ProductsBloc] LoadProducts error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] LoadProducts error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -72,7 +72,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       final product = await _repository.getProduct(event.productId);
       emit(ProductDetailLoaded(product: product));
     } catch (e) {
-      debugPrint('[ProductsBloc] LoadProductDetail error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] LoadProductDetail error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -85,7 +85,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       final categories = await _repository.getCategories();
       emit(CategoriesLoaded(categories: categories));
     } catch (e) {
-      debugPrint('[ProductsBloc] LoadCategories error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] LoadCategories error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -102,7 +102,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
         product: product,
       ));
     } catch (e) {
-      debugPrint('[ProductsBloc] CreateProduct error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] CreateProduct error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -120,7 +120,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
         product: product,
       ));
     } catch (e) {
-      debugPrint('[ProductsBloc] UpdateProduct error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] UpdateProduct error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -133,7 +133,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       await _repository.deleteProduct(event.productId);
       emit(const ProductActionSuccess(message: 'Producto eliminado'));
     } catch (e) {
-      debugPrint('[ProductsBloc] DeleteProduct error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] DeleteProduct error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -152,7 +152,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
         product: product,
       ));
     } catch (e) {
-      debugPrint('[ProductsBloc] ToggleFeatured error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] ToggleFeatured error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -169,7 +169,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
         product: product,
       ));
     } catch (e) {
-      debugPrint('[ProductsBloc] UpdateProductStock error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] UpdateProductStock error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -184,7 +184,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       final categories = await _repository.getCategories();
       emit(CategoriesLoaded(categories: categories));
     } catch (e) {
-      debugPrint('[ProductsBloc] CreateCategory error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] CreateCategory error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -199,7 +199,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       final categories = await _repository.getCategories();
       emit(CategoriesLoaded(categories: categories));
     } catch (e) {
-      debugPrint('[ProductsBloc] UpdateCategory error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] UpdateCategory error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }
@@ -213,7 +213,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
       final categories = await _repository.getCategories();
       emit(CategoriesLoaded(categories: categories));
     } catch (e) {
-      debugPrint('[ProductsBloc] DeleteCategory error: $e');
+      if (kDebugMode) debugPrint('[ProductsBloc] DeleteCategory error: $e');
       emit(ProductsError(message: _extractError(e)));
     }
   }

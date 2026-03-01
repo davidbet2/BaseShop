@@ -10,7 +10,7 @@ import '../constants/api_constants.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  debugPrint('[FCM] Background message: ${message.messageId}');
+  if (kDebugMode) debugPrint('[FCM] Background message: ${message.messageId}');
 }
 
 class PushNotificationService {
@@ -55,7 +55,7 @@ class PushNotificationService {
     await _localNotifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (response) {
-        debugPrint('[FCM] Local notification tapped: ${response.payload}');
+        if (kDebugMode) debugPrint('[FCM] Local notification tapped: ${response.payload}');
       },
     );
 
@@ -83,7 +83,7 @@ class PushNotificationService {
         await _registerTokenWithBackend(token);
       }
     } catch (e) {
-      debugPrint('[FCM] Error getting token: $e');
+      if (kDebugMode) debugPrint('[FCM] Error getting token: $e');
     }
   }
 
@@ -96,7 +96,7 @@ class PushNotificationService {
         );
       }
     } catch (e) {
-      debugPrint('[FCM] Error unregistering: $e');
+      if (kDebugMode) debugPrint('[FCM] Error unregistering: $e');
     }
   }
 
@@ -115,7 +115,7 @@ class PushNotificationService {
         },
       );
     } catch (e) {
-      debugPrint('[FCM] Error registering token: $e');
+      if (kDebugMode) debugPrint('[FCM] Error registering token: $e');
     }
   }
 
@@ -143,7 +143,7 @@ class PushNotificationService {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
-    debugPrint('[FCM] Notification tapped: ${message.data}');
+    if (kDebugMode) debugPrint('[FCM] Notification tapped: ${message.data}');
     // TODO: Navigate to specific screen based on message.data
   }
 }

@@ -122,7 +122,7 @@ class AuthRepository {
     try {
       await _apiClient.dio.post(ApiConstants.logout);
     } catch (e) {
-      debugPrint('[AuthRepository] Logout request failed: $e');
+      if (kDebugMode) debugPrint('[AuthRepository] Logout request failed: $e');
     } finally {
       await _apiClient.clearTokens();
     }

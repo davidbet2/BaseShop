@@ -35,7 +35,7 @@ class ReviewsBloc extends Bloc<ReviewsEvent, ReviewsState> {
 
       emit(ReviewsLoaded(reviews: reviews, summary: summary));
     } catch (e) {
-      debugPrint('[ReviewsBloc] LoadProductReviews error: $e');
+      if (kDebugMode) debugPrint('[ReviewsBloc] LoadProductReviews error: $e');
       emit(ReviewsError(message: _extractError(e)));
     }
   }
@@ -54,7 +54,7 @@ class ReviewsBloc extends Bloc<ReviewsEvent, ReviewsState> {
       );
       emit(const ReviewCreated());
     } catch (e) {
-      debugPrint('[ReviewsBloc] CreateReview error: $e');
+      if (kDebugMode) debugPrint('[ReviewsBloc] CreateReview error: $e');
       emit(ReviewsError(message: _extractError(e)));
     }
   }
@@ -72,7 +72,7 @@ class ReviewsBloc extends Bloc<ReviewsEvent, ReviewsState> {
 
       emit(ReviewsLoaded(reviews: reviews, summary: const {}));
     } catch (e) {
-      debugPrint('[ReviewsBloc] LoadMyReviews error: $e');
+      if (kDebugMode) debugPrint('[ReviewsBloc] LoadMyReviews error: $e');
       emit(ReviewsError(message: _extractError(e)));
     }
   }

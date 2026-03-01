@@ -135,25 +135,33 @@ const initDatabase = async () => {
   save();
 
   // ── Seed: admin por defecto ──
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@baseshop.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail);
-  if (!existing) {
-    const hashedPassword = await bcrypt.hash(adminPassword, 10);
-    db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, role, email_verified)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(uuidv4(), adminEmail, hashedPassword, 'Admin', 'BaseShop', 'admin', 1);
-    console.log(`[auth-service] Admin user created: ${adminEmail}`);
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) {
+    console.warn('ADMIN_EMAIL and ADMIN_PASSWORD not set, skipping admin seed');
+  } else {
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail);
+    if (!existing) {
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, role, email_verified)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(uuidv4(), adminEmail, hashedPassword, 'Admin', 'BaseShop', 'admin', 1);
+      console.log(`[auth-service] Admin user created: ${adminEmail}`);
+    }
   }
 
   // ── Seed: usuario cliente de prueba ──
-  const clientEmail = 'cliente@test.com';
-  const clientPassword = 'Cliente123!';
-  const existingClient = db.prepare('SELECT id FROM users WHERE email = ?').get(clientEmail);
-  if (!existingClient) {
-    const hashedClientPassword = await bcrypt.hash(clientPassword, 10);
-    db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, role, email_verified)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(uuidv4(), clientEmail, hashedClientPassword, 'Cliente', 'Test', 'client', 1);
-    console.log(`[auth-service] Test client user created: ${clientEmail}`);
+  const clientEmail = process.env.TEST_CLIENT_EMAIL;
+  const clientPassword = process.env.TEST_CLIENT_PASSWORD;
+  if (!clientEmail || !clientPassword) {
+    console.warn('TEST_CLIENT_EMAIL and TEST_CLIENT_PASSWORD not set, skipping test client seed');
+  } else {
+    const existingClient = db.prepare('SELECT id FROM users WHERE email = ?').get(clientEmail);
+    if (!existingClient) {
+      const hashedClientPassword = await bcrypt.hash(clientPassword, 10);
+      db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, role, email_verified)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`).run(uuidv4(), clientEmail, hashedClientPassword, 'Cliente', 'Test', 'client', 1);
+      console.log(`[auth-service] Test client user created: ${clientEmail}`);
+    }
   }
 
   // Auto-save cada 5 segundos

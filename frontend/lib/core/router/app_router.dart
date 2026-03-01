@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -101,7 +102,7 @@ late final _authNotifier = _AuthNotifier();
 // ── Router ──────────────────────────────────────────────────
 late final GoRouter appRouter = GoRouter(
   initialLocation: '/home',
-  debugLogDiagnostics: true,
+  debugLogDiagnostics: kDebugMode,
   refreshListenable: _authNotifier,
   redirect: (BuildContext context, GoRouterState state) {
     try {
@@ -140,7 +141,7 @@ late final GoRouter appRouter = GoRouter(
 
     return null; // no redirect
     } catch (e) {
-      debugPrint('[Router] Redirect error: $e');
+      if (kDebugMode) debugPrint('[Router] Redirect error: $e');
       return null;
     }
   },

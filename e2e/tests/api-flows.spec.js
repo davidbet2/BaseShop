@@ -106,7 +106,10 @@ test.describe.serial('Products & Categories', () => {
 
   test('Login as admin', async ({ request }) => {
     const res = await request.post(`${BASE}/auth/login`, {
-      data: { email: 'admin@baseshop.com', password: 'Admin123!' },
+      data: {
+        email: process.env.TEST_ADMIN_EMAIL || 'admin@baseshop.com',
+        password: process.env.TEST_ADMIN_PASSWORD || 'Admin123!',
+      },
       headers: { 'x-platform': 'mobile' },
     });
     if (res.ok()) {

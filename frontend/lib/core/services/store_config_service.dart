@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:baseshop/core/network/api_client.dart';
 
@@ -15,7 +16,7 @@ class StoreConfigService {
       final data = response.data as Map<String, dynamic>;
       return StoreConfig.fromJson(data);
     } catch (e) {
-      debugPrint('[StoreConfigService] getConfig error: $e');
+      if (kDebugMode) debugPrint('[StoreConfigService] getConfig error: $e');
       // Return defaults on network error so the app still works offline
       return const StoreConfig(
         showHeader: true,

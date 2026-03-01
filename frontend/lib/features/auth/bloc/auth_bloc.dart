@@ -34,7 +34,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final user = await _repository.getMe();
       emit(AuthAuthenticated(user: user));
     } catch (e) {
-      debugPrint('[AuthBloc] Check failed: $e');
+      if (kDebugMode) debugPrint('[AuthBloc] Check failed: $e');
       emit(const AuthUnauthenticated());
     }
   }
@@ -115,7 +115,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       await _repository.logout();
     } catch (e) {
-      debugPrint('[AuthBloc] Logout error: $e');
+      if (kDebugMode) debugPrint('[AuthBloc] Logout error: $e');
     }
     emit(const AuthUnauthenticated());
   }

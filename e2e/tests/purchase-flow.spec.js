@@ -28,8 +28,8 @@ const crypto = require('crypto');
 
 const FRONTEND = 'http://localhost:8080';
 const API = 'http://localhost:3000/api';
-const USER_EMAIL = 'cliente@test.com';
-const USER_PASSWORD = 'Cliente123!';
+const USER_EMAIL = process.env.TEST_USER_EMAIL || 'cliente@test.com';
+const USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'Cliente123!';
 
 test.describe.serial('Compra completa — Login → Producto → Checkout UI → PayU → Aprobado', () => {
 
@@ -919,11 +919,12 @@ test.describe.serial('Compra completa — Login → Producto → Checkout UI →
     const amount = paymentInfo?.amount || createdOrder.total;
 
     // Calculate signature for validation
-    const apiKey = '4Vj8eK4rloUd272L48hsrarnUA';
+    const apiKey = process.env.TEST_PAYU_API_KEY || '4Vj8eK4rloUd272L48hsrarnUA';
+    const merchantId = process.env.TEST_PAYU_MERCHANT_ID || '508029';
     let fmtAmt = parseFloat(String(amount));
     fmtAmt = fmtAmt % 1 === 0 ? fmtAmt.toFixed(1) : String(fmtAmt);
     const sig = crypto.createHash('md5')
-      .update(`${apiKey}~508029~${ref}~${fmtAmt}~COP~4`)
+      .update(`${apiKey}~${merchantId}~${ref}~${fmtAmt}~COP~4`)
       .digest('hex');
 
     // Validate PayU response
@@ -956,7 +957,7 @@ test.describe.serial('Compra completa — Login → Producto → Checkout UI →
           payment_status: 'approved',
           note: 'Pago aprobado por PayU (E2E)',
         },
-        headers: { 'X-Internal-Service': 'baseshop-internal-dev' },
+        headers: { 'X-Internal-Service': process.env.TEST_INTERNAL_SECRET || 'baseshop-internal-dev' },
       }
     );
     console.log(`  ✓ Order direct update: ${directResp.status()}`);

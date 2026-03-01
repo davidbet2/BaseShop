@@ -21,10 +21,10 @@ const crypto = require('crypto');
 
 const FRONTEND = 'http://localhost:8080';
 const API = 'http://localhost:3000/api';
-const USER_EMAIL = 'cliente@test.com';
-const USER_PASSWORD = 'Cliente123!';
-const PAYU_API_KEY = '4Vj8eK4rloUd272L48hsrarnUA';
-const PAYU_MERCHANT_ID = '508029';
+const USER_EMAIL = process.env.TEST_USER_EMAIL || 'cliente@test.com';
+const USER_PASSWORD = process.env.TEST_USER_PASSWORD || 'Cliente123!';
+const PAYU_API_KEY = process.env.TEST_PAYU_API_KEY || '4Vj8eK4rloUd272L48hsrarnUA';
+const PAYU_MERCHANT_ID = process.env.TEST_PAYU_MERCHANT_ID || '508029';
 
 // ═══════════════════════════════════════════════
 // Test case definitions
@@ -711,7 +711,7 @@ async function doVerification(page, h, createdOrder, tc, authToken) {
             payment_status: 'approved',
             note: 'Pago aprobado por PayU (E2E full-flow)',
           },
-          headers: { 'X-Internal-Service': 'baseshop-internal-dev' },
+          headers: { 'X-Internal-Service': process.env.TEST_INTERNAL_SECRET || 'baseshop-internal-dev' },
         }
       );
     }

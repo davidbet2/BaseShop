@@ -150,15 +150,17 @@ app.use((req, res) => {
 
 app.listen(PORT, () => {
   console.log(`[api-gateway] Running on port ${PORT}`);
-  console.log(`[api-gateway] Services:`, {
-    auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
-    users: process.env.USERS_SERVICE_URL || 'http://localhost:3002',
-    products: process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003',
-    cart: process.env.CART_SERVICE_URL || 'http://localhost:3004',
-    orders: process.env.ORDERS_SERVICE_URL || 'http://localhost:3005',
-    payments: process.env.PAYMENTS_SERVICE_URL || 'http://localhost:3006',
-    reviews: process.env.REVIEWS_SERVICE_URL || 'http://localhost:3007',
-    favorites: process.env.FAVORITES_SERVICE_URL || 'http://localhost:3008',
-    config: process.env.CONFIG_SERVICE_URL || 'http://localhost:3009',
-  });
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[api-gateway] Services:`, {
+      auth: process.env.AUTH_SERVICE_URL || 'http://localhost:3001',
+      users: process.env.USERS_SERVICE_URL || 'http://localhost:3002',
+      products: process.env.PRODUCTS_SERVICE_URL || 'http://localhost:3003',
+      cart: process.env.CART_SERVICE_URL || 'http://localhost:3004',
+      orders: process.env.ORDERS_SERVICE_URL || 'http://localhost:3005',
+      payments: process.env.PAYMENTS_SERVICE_URL || 'http://localhost:3006',
+      reviews: process.env.REVIEWS_SERVICE_URL || 'http://localhost:3007',
+      favorites: process.env.FAVORITES_SERVICE_URL || 'http://localhost:3008',
+      config: process.env.CONFIG_SERVICE_URL || 'http://localhost:3009',
+    });
+  }
 });

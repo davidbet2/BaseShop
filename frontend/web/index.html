@@ -23,6 +23,9 @@
   <!-- Google Sign-In -->
   <meta name="google-signin-client_id" content="523139154121-19e2a8br6ce22mabnn1h2jk1jrg38srs.apps.googleusercontent.com">
 
+  <!-- Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.google.com https://www.gstatic.com https://apis.google.com 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' http://localhost:* https://localhost:* https://www.google.com https://accounts.google.com; frame-src https://www.google.com https://accounts.google.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self';">
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -48,22 +51,17 @@
   <script src="https://www.google.com/recaptcha/api.js?render=6Lfu5ncsAAAAABIBMAip82uFsPoiRyrmYOuQiDlq"></script>
   <script>
     function executeRecaptcha(action) {
-      console.log('[reCAPTCHA-JS] executeRecaptcha called with action:', action);
       return new Promise(function(resolve, reject) {
         if (typeof grecaptcha === 'undefined') {
-          console.error('[reCAPTCHA-JS] grecaptcha not loaded');
           reject(new Error('grecaptcha not loaded'));
           return;
         }
         grecaptcha.ready(function() {
-          console.log('[reCAPTCHA-JS] grecaptcha ready, executing...');
           grecaptcha.execute('6Lfu5ncsAAAAABIBMAip82uFsPoiRyrmYOuQiDlq', { action: action })
             .then(function(token) {
-              console.log('[reCAPTCHA-JS] Token obtained:', token ? token.substring(0, 20) + '...' : 'EMPTY');
               resolve(token);
             })
             .catch(function(e) {
-              console.error('[reCAPTCHA-JS] Execute error:', e);
               reject(e);
             });
         });

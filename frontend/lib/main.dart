@@ -68,7 +68,7 @@ Future<void> _initApp() async {
   try {
     await getIt<ApiClient>().loadTokensFromStorage();
   } catch (e) {
-    debugPrint('[Main] Load tokens error: $e');
+    if (kDebugMode) debugPrint('[Main] Load tokens error: $e');
   }
 
   // ── Push notifications (mobile only) ─────────────────
@@ -76,7 +76,7 @@ Future<void> _initApp() async {
     try {
       await getIt<PushNotificationService>().initialize();
     } catch (e) {
-      debugPrint('[Main] Push notifications init error: $e');
+      if (kDebugMode) debugPrint('[Main] Push notifications init error: $e');
     }
   }
 

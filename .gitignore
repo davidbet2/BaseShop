@@ -63,6 +63,9 @@ frontend/ios/Flutter/Flutter.podspec
 # Docker
 docker-compose.override.yml
 
+# Data directories
+data/
+
 # Backups / temp
 *.bak
 *.tmp

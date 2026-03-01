@@ -2,18 +2,12 @@ const axios = require('axios');
 const RECAPTCHA_THRESHOLD = parseFloat(process.env.RECAPTCHA_THRESHOLD || '0.5');
 
 const verifyRecaptcha = async (req, res, next) => {
-  const userAgent = req.headers['user-agent'] || '';
-  const xPlatform = req.headers['x-platform'] || '';
+  // 1) Check for mobile app signature (for native mobile clients that can't use reCAPTCHA)
+  const appSignature = req.headers['x-app-signature'];
+  const mobileAppSecret = process.env.MOBILE_APP_SECRET;
 
-  // 1) Detectar cliente móvil — SIEMPRE saltar reCAPTCHA
-  const isMobile = xPlatform.toLowerCase() === 'mobile' ||
-    userAgent.includes('Dart') ||
-    userAgent.includes('okhttp') ||
-    userAgent.includes('Flutter') ||
-    (!userAgent.includes('Mozilla') && !userAgent.includes('Chrome') && !userAgent.includes('Safari'));
-
-  if (isMobile) {
-    console.log('[reCAPTCHA] ✅ Mobile client detected, skipping');
+  if (appSignature && mobileAppSecret && appSignature === mobileAppSecret) {
+    req.recaptchaVerified = true;
     return next();
   }
 
@@ -47,10 +41,11 @@ const verifyRecaptcha = async (req, res, next) => {
     req.recaptchaScore = score;
     next();
   } catch (error) {
-    // M4 fix: log warning but still allow (with a warning flag for rate-limiting)
-    console.warn('[reCAPTCHA] ⚠️  Google verification failed (network error):', error.message);
-    req.recaptchaBypass = true; // flag for downstream rate-limiting
-    next();
+    console.error('[reCAPTCHA] Google verification failed (network error):', error.message);
+    return res.status(503).json({
+      success: false,
+      message: 'Security verification temporarily unavailable. Please try again.'
+    });
   }
 };
 

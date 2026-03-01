@@ -35,7 +35,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         itemCount: itemCount,
       ));
     } catch (e) {
-      debugPrint('[CartBloc] LoadCart error: $e');
+      if (kDebugMode) debugPrint('[CartBloc] LoadCart error: $e');
       emit(CartError(message: _extractError(e)));
     }
   }
@@ -55,7 +55,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       );
       add(const LoadCart());
     } catch (e) {
-      debugPrint('[CartBloc] AddToCart error: $e');
+      if (kDebugMode) debugPrint('[CartBloc] AddToCart error: $e');
       emit(CartError(message: _extractError(e)));
     }
   }
@@ -68,7 +68,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       await _repository.updateItem(event.itemId, event.quantity);
       add(const LoadCart());
     } catch (e) {
-      debugPrint('[CartBloc] UpdateCartItem error: $e');
+      if (kDebugMode) debugPrint('[CartBloc] UpdateCartItem error: $e');
       emit(CartError(message: _extractError(e)));
     }
   }
@@ -81,7 +81,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       await _repository.removeItem(event.itemId);
       add(const LoadCart());
     } catch (e) {
-      debugPrint('[CartBloc] RemoveCartItem error: $e');
+      if (kDebugMode) debugPrint('[CartBloc] RemoveCartItem error: $e');
       emit(CartError(message: _extractError(e)));
     }
   }
@@ -94,7 +94,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       await _repository.clearCart();
       emit(const CartLoaded(items: [], subtotal: 0.0, itemCount: 0));
     } catch (e) {
-      debugPrint('[CartBloc] ClearCart error: $e');
+      if (kDebugMode) debugPrint('[CartBloc] ClearCart error: $e');
       emit(CartError(message: _extractError(e)));
     }
   }
@@ -114,7 +114,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         ));
       }
     } catch (e) {
-      debugPrint('[CartBloc] LoadCartCount error: $e');
+      if (kDebugMode) debugPrint('[CartBloc] LoadCartCount error: $e');
     }
   }
 

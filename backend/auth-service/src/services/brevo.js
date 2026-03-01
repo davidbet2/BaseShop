@@ -3,6 +3,7 @@
 // Envía emails transaccionales: verificación y recuperación
 // ══════════════════════════════════════════════════════════
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 const SMTP_HOST = process.env.BREVO_SMTP_HOST || 'smtp-relay.brevo.com';
 const SMTP_PORT = parseInt(process.env.BREVO_SMTP_PORT || '587', 10);
@@ -24,7 +25,7 @@ function getTransporter() {
       port: SMTP_PORT,
       secure: false, // STARTTLS
       auth: { user: SMTP_USER, pass: SMTP_PASS },
-      tls: { rejectUnauthorized: false },
+      tls: { rejectUnauthorized: process.env.NODE_ENV !== 'development' },
     });
     console.log(`[Brevo] SMTP transport ready → ${SMTP_HOST}:${SMTP_PORT}`);
   }
@@ -35,7 +36,7 @@ function getTransporter() {
  * Genera un código numérico de 6 dígitos
  */
 function generateCode() {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return crypto.randomInt(100000, 999999).toString();
 }
 
 /**

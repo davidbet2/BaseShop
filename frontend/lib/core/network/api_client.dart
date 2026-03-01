@@ -89,7 +89,7 @@ class ApiClient {
                   return handler.resolve(retryResponse);
                 }
               } catch (e) {
-                debugPrint('[ApiClient] Refresh failed: $e');
+              if (kDebugMode) debugPrint('[ApiClient] Refresh failed: $e');
                 await clearTokens();
               } finally {
                 _isRefreshing = false;
@@ -97,7 +97,7 @@ class ApiClient {
             }
           }
         } catch (e) {
-          debugPrint('[ApiClient] Interceptor error: $e');
+          if (kDebugMode) debugPrint('[ApiClient] Interceptor error: $e');
         }
         handler.next(error);
       },
@@ -111,7 +111,7 @@ class ApiClient {
       await _storage.write(key: 'access_token', value: token);
       await _storage.write(key: 'refresh_token', value: refreshToken);
     } catch (e) {
-      debugPrint('[ApiClient] Storage write error: $e');
+      if (kDebugMode) debugPrint('[ApiClient] Storage write error: $e');
     }
   }
 
@@ -121,7 +121,7 @@ class ApiClient {
     try {
       await _storage.deleteAll();
     } catch (e) {
-      debugPrint('[ApiClient] Storage clear error: $e');
+      if (kDebugMode) debugPrint('[ApiClient] Storage clear error: $e');
     }
   }
 
@@ -131,7 +131,7 @@ class ApiClient {
       _cachedToken = await _storage.read(key: 'access_token');
       _cachedRefreshToken = await _storage.read(key: 'refresh_token');
     } catch (e) {
-      debugPrint('[ApiClient] Storage read error: $e');
+      if (kDebugMode) debugPrint('[ApiClient] Storage read error: $e');
     }
     return _cachedToken;
   }
@@ -144,7 +144,7 @@ class ApiClient {
       // Check storage version — clear stale tokens from previous builds
       final version = await _storage.read(key: 'storage_version');
       if (version != _storageVersion) {
-        debugPrint('[ApiClient] Storage version mismatch ($version != $_storageVersion) — clearing tokens');
+        if (kDebugMode) debugPrint('[ApiClient] Storage version mismatch ($version != $_storageVersion) — clearing tokens');
         await clearTokens();
         await _storage.write(key: 'storage_version', value: _storageVersion);
         return;
@@ -155,11 +155,11 @@ class ApiClient {
 
       // Validate JWT expiry client-side
       if (_cachedToken != null && _isTokenExpired(_cachedToken!)) {
-        debugPrint('[ApiClient] Stored token is expired — clearing');
+        if (kDebugMode) debugPrint('[ApiClient] Stored token is expired — clearing');
         await clearTokens();
       }
     } catch (e) {
-      debugPrint('[ApiClient] loadTokensFromStorage error: $e');
+      if (kDebugMode) debugPrint('[ApiClient] loadTokensFromStorage error: $e');
     }
   }
 
@@ -182,7 +182,7 @@ class ApiClient {
       final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
       return DateTime.now().isAfter(expiryDate);
     } catch (e) {
-      debugPrint('[ApiClient] JWT decode error: $e');
+      if (kDebugMode) debugPrint('[ApiClient] JWT decode error: $e');
       return true; // Can't decode → treat as invalid
     }
   }

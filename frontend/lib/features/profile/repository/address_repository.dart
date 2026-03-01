@@ -1,13 +1,14 @@
 import 'package:baseshop/core/constants/api_constants.dart';
 import 'package:baseshop/core/network/api_client.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 
 /// Repository that synchronizes addresses with the backend API.
-/// Uses SharedPreferences as a local cache for offline/fallback.
+/// Uses FlutterSecureStorage as a local cache for offline/fallback.
 class AddressRepository {
   final ApiClient _apiClient;
   static const _cacheKey = 'user_addresses';
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   AddressRepository(this._apiClient);
 
@@ -110,13 +111,11 @@ class AddressRepository {
   // ── Local cache helpers ──────────────────────────────────
 
   Future<void> _saveToCache(List<Map<String, dynamic>> addresses) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_cacheKey, jsonEncode(addresses));
+    await _secureStorage.write(key: _cacheKey, value: jsonEncode(addresses));
   }
 
   Future<List<Map<String, dynamic>>> _loadFromCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_cacheKey) ?? '[]';
+    final raw = await _secureStorage.read(key: _cacheKey) ?? '[]';
     try {
       return List<Map<String, dynamic>>.from(jsonDecode(raw));
     } catch (_) {

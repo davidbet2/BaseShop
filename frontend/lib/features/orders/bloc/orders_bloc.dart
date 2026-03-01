@@ -42,7 +42,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
 
       emit(OrdersLoaded(orders: orders, total: total, page: page));
     } catch (e) {
-      debugPrint('[OrdersBloc] LoadMyOrders error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] LoadMyOrders error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }
@@ -56,7 +56,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final order = await _repository.getOrderDetail(event.orderId);
       emit(OrderDetailLoaded(order: order));
     } catch (e) {
-      debugPrint('[OrdersBloc] LoadOrderDetail error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] LoadOrderDetail error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }
@@ -75,7 +75,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       );
       emit(OrderCreated(order: order));
     } catch (e) {
-      debugPrint('[OrdersBloc] CreateOrder error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] CreateOrder error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }
@@ -101,7 +101,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
 
       emit(OrdersLoaded(orders: orders, total: total, page: page));
     } catch (e) {
-      debugPrint('[OrdersBloc] LoadAllOrders error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] LoadAllOrders error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }
@@ -114,7 +114,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final stats = await _repository.getOrderStats();
       emit(OrderStatsLoaded(stats: stats));
     } catch (e) {
-      debugPrint('[OrdersBloc] LoadOrderStats error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] LoadOrderStats error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }
@@ -128,7 +128,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       final order = await _repository.getAdminOrderDetail(event.orderId);
       emit(OrderDetailLoaded(order: order));
     } catch (e) {
-      debugPrint('[OrdersBloc] LoadAdminOrderDetail error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] LoadAdminOrderDetail error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }
@@ -146,7 +146,7 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
       );
       emit(OrderStatusUpdated(order: order));
     } catch (e) {
-      debugPrint('[OrdersBloc] UpdateOrderStatus error: $e');
+      if (kDebugMode) debugPrint('[OrdersBloc] UpdateOrderStatus error: $e');
       emit(OrdersError(message: _extractError(e)));
     }
   }

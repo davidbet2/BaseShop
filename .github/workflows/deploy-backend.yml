@@ -38,10 +38,15 @@ jobs:
 
       - name: Run tests
         working-directory: backend/${{ matrix.service }}
-        run: npm test || echo "No tests found, skipping"
+        run: npm test --if-present
+        continue-on-error: false
         env:
-          JWT_SECRET: test-secret-key
+          JWT_SECRET: ${{ secrets.JWT_SECRET_TEST }}
           NODE_ENV: test
+
+      - name: Security audit
+        run: npm audit --audit-level=high --omit=dev || true
+        working-directory: backend
 
       - name: Syntax validation
         working-directory: backend/${{ matrix.service }}

@@ -6,4 +6,7 @@ COPY . .
 EXPOSE 3009
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:3009/health || exit 1
+# Security: run as non-root user
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+USER appuser
 CMD ["node", "src/server.js"]

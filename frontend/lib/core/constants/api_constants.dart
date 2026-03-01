@@ -3,12 +3,13 @@ import 'package:flutter/foundation.dart';
 class ApiConstants {
   static const String _prodUrl =
       String.fromEnvironment('API_BASE_URL', defaultValue: '');
-  static const String _devUrl = 'http://localhost:3000/api';
+  static const String _devUrl = 'https://localhost:3000/api';
 
   static String get baseUrl {
     // In release mode, use prod URL if defined; otherwise fall back to dev URL
     // so local `flutter build web` works without --dart-define.
     if (kReleaseMode && _prodUrl.isNotEmpty) {
+      assert(_prodUrl.startsWith('https://'), 'API_BASE_URL must use HTTPS in production');
       return _prodUrl;
     }
     return _devUrl;

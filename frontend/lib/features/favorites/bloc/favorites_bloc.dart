@@ -43,7 +43,7 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
         favoriteIds: Set<String>.from(_favoriteIds),
       ));
     } catch (e) {
-      debugPrint('[FavoritesBloc] LoadFavorites error: $e');
+      if (kDebugMode) debugPrint('[FavoritesBloc] LoadFavorites error: $e');
       emit(FavoritesError(message: _extractError(e)));
     }
   }
@@ -66,7 +66,7 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       // Reload full list to stay in sync
       add(const LoadFavorites());
     } catch (e) {
-      debugPrint('[FavoritesBloc] AddFavorite error: $e');
+      if (kDebugMode) debugPrint('[FavoritesBloc] AddFavorite error: $e');
       _favoriteIds.remove(event.productId);
       emit(FavoritesError(message: _extractError(e)));
     }
@@ -84,7 +84,7 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       await _repository.removeFavorite(event.productId);
       add(const LoadFavorites());
     } catch (e) {
-      debugPrint('[FavoritesBloc] RemoveFavorite error: $e');
+      if (kDebugMode) debugPrint('[FavoritesBloc] RemoveFavorite error: $e');
       _favoriteIds.add(event.productId);
       emit(FavoritesError(message: _extractError(e)));
     }
@@ -103,7 +103,7 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       }
       _emitCurrentState(emit);
     } catch (e) {
-      debugPrint('[FavoritesBloc] CheckFavorite error: $e');
+      if (kDebugMode) debugPrint('[FavoritesBloc] CheckFavorite error: $e');
     }
   }
 

@@ -46,7 +46,11 @@ router.patch('/:id/payment-status', [
   try {
     // H1 fix: verify internal service secret, not just header presence
     const internalHeader = req.headers['x-internal-service'];
-    const expectedSecret = process.env.INTERNAL_SERVICE_SECRET || 'baseshop-internal-dev';
+    const expectedSecret = process.env.INTERNAL_SERVICE_SECRET;
+    if (!expectedSecret) {
+      console.error('[orders-service] INTERNAL_SERVICE_SECRET not configured');
+      return res.status(500).json({ error: 'Configuración del servidor incompleta' });
+    }
     if (!internalHeader || internalHeader !== expectedSecret) {
       return res.status(403).json({ error: 'Acceso no autorizado' });
     }

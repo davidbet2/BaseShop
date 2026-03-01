@@ -18,11 +18,15 @@ function handleValidation(req, res) {
   return null;
 }
 
-// PayU Configuration (defaults are PayU Sandbox/test credentials)
-const PAYU_API_KEY = () => process.env.PAYU_API_KEY || '4Vj8eK4rloUd272L48hsrarnUA';
-const PAYU_API_LOGIN = () => process.env.PAYU_API_LOGIN || 'pRRXKOl8ikMmt9u';
-const PAYU_MERCHANT_ID = () => process.env.PAYU_MERCHANT_ID || '508029';
-const PAYU_ACCOUNT_ID = () => process.env.PAYU_ACCOUNT_ID || '512321';
+// PayU Configuration — credentials must be provided via environment variables
+if (!process.env.PAYU_API_KEY || !process.env.PAYU_API_LOGIN || !process.env.PAYU_MERCHANT_ID || !process.env.PAYU_ACCOUNT_ID) {
+  console.error('FATAL: PAYU_API_KEY, PAYU_API_LOGIN, PAYU_MERCHANT_ID, and PAYU_ACCOUNT_ID environment variables are required');
+  process.exit(1);
+}
+const PAYU_API_KEY = () => process.env.PAYU_API_KEY;
+const PAYU_API_LOGIN = () => process.env.PAYU_API_LOGIN;
+const PAYU_MERCHANT_ID = () => process.env.PAYU_MERCHANT_ID;
+const PAYU_ACCOUNT_ID = () => process.env.PAYU_ACCOUNT_ID;
 const PAYU_IS_TEST = () => (process.env.PAYU_IS_TEST || 'true') === 'true';
 
 const PAYU_API_URL = () =>
@@ -71,7 +75,11 @@ async function notifyOrderService(orderId, paymentStatus, paymentId) {
     };
 
     const url = `${ORDERS_SERVICE_URL()}/api/orders/${orderId}/payment-status`;
-    const internalSecret = process.env.INTERNAL_SERVICE_SECRET || 'baseshop-internal-dev';
+    const internalSecret = process.env.INTERNAL_SERVICE_SECRET;
+    if (!internalSecret) {
+      console.error('[payments-service] INTERNAL_SERVICE_SECRET not configured, cannot notify orders-service');
+      return;
+    }
     await axios.patch(url, {
       status: newOrderStatus,
       payment_id: paymentId,
@@ -482,7 +490,10 @@ router.post('/validate-response', [
 
       if (expectedSignature !== signature) {
         console.warn('[payments-service] Invalid PayU response signature. Expected:', expectedSignature, 'Got:', signature);
-        // Don't reject — still use the transactionState since it came via the user's browser redirect
+        return res.status(403).json({
+          success: false,
+          message: 'Invalid payment signature'
+        });
       }
     }
 

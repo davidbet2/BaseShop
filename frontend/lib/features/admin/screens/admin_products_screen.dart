@@ -5,7 +5,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart' as dio_pkg;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 
 import 'package:baseshop/core/di/injection.dart';
 import 'package:baseshop/core/network/api_client.dart';
@@ -2222,7 +2222,7 @@ class _AdminProductsScreenState extends State<AdminProductsScreen>
           SnackBar(content: Text('Error al subir imagen: $e'), backgroundColor: AppTheme.errorColor),
         );
       }
-      debugPrint('Upload error: $e');
+      if (kDebugMode) debugPrint('Upload error: $e');
       return null;
     }
   }
