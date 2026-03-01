@@ -289,3 +289,42 @@ describe('GET /api/orders/stats/summary (admin)', () => {
     expect(res.body.data.revenue.today).toBeDefined();
   });
 });
+
+// ══════════════════════════════════════
+// Error Handling Tests
+// ══════════════════════════════════════
+describe('Error Handling', () => {
+  it('PATCH /api/orders/:id/payment-status should return 404 for non-existent order', async () => {
+    const res = await request(app)
+      .patch('/api/orders/non-existent-order/payment-status')
+      .set('x-internal-service', 'test-internal-secret')
+      .send({ status: 'confirmed' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('PATCH /api/orders/:id/status should return 404 for non-existent order', async () => {
+    const res = await request(app)
+      .patch('/api/orders/non-existent-order/status')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'processing' });
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/orders/me/:id should return 404 for non-existent order', async () => {
+    const res = await request(app)
+      .get('/api/orders/me/non-existent-order')
+      .set('Authorization', `Bearer ${clientToken}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('GET /api/orders/:id (admin) should return 404 for non-existent order', async () => {
+    const res = await request(app)
+      .get('/api/orders/non-existent-order')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(404);
+  });
+});

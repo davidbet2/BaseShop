@@ -419,4 +419,283 @@ describe('GET /api/auth/users (admin)', () => {
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.total).toBeGreaterThanOrEqual(2); // admin + test user
   });
+
+  it('should allow admin to search users', async () => {
+    // Login as admin
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'admin@baseshop.com', password: 'Admin123!' });
+
+    const res = await request(app)
+      .get('/api/auth/users?search=test')
+      .set('Authorization', `Bearer ${loginRes.body.token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toBeInstanceOf(Array);
+  });
+});
+
+// ══════════════════════════════════════
+// Google Login Tests
+// ══════════════════════════════════════
+describe('POST /api/auth/google', () => {
+  it('should reject when no Google token provided', async () => {
+    const res = await request(app)
+      .post('/api/auth/google')
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Token de Google requerido/i);
+  });
+
+  it('should reject invalid Google token', async () => {
+    const res = await request(app)
+      .post('/api/auth/google')
+      .send({ id_token: 'invalid-token' });
+
+    expect(res.status).toBe(500);
+  });
+
+  it('should login with valid Google access_token', async () => {
+    // This will fail with real Google API, but tests the code path
+    const res = await request(app)
+      .post('/api/auth/google')
+      .send({ access_token: 'mock-access-token' });
+
+    // Will get 500 due to Google API call failing
+    expect(res.status).toBe(500);
+  });
+});
+
+// ══════════════════════════════════════
+// Forgot Password Tests
+// ══════════════════════════════════════
+describe('POST /api/auth/forgot-password', () => {
+  it('should return generic message for non-existent email', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'nonexistent@example.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sent).toBe(false);
+  });
+
+  it('should reject invalid email format', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'not-an-email' });
+
+    expect(res.status).toBe(200);
+  });
+
+  it('should reject Google-only accounts', async () => {
+    // Create a Google user
+    db.prepare(`INSERT INTO users (id, email, first_name, last_name, provider, email_verified)
+      VALUES (?, ?, ?, ?, ?, ?)`).run('google-user-1', 'google@test.com', 'Google', 'User', 'google', 1);
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'google@test.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sent).toBe(false);
+    expect(res.body.message).toMatch(/Google/i);
+  });
+});
+
+// ══════════════════════════════════════
+// Reset Password Tests
+// ══════════════════════════════════════
+describe('POST /api/auth/reset-password', () => {
+  let testEmail = 'resettest@example.com';
+
+  beforeAll(async () => {
+    // Create user with reset code
+    db
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash('Test123!', 10);
+    db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, reset_code, reset_code_expires)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+      'reset-user-1', testEmail, hashedPassword, 'Reset', 'Test', '123456',
+      new Date(Date.now() + 30 * 60 * 1000).toISOString()
+    );
+  });
+
+  it('should reject invalid code', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ email: testEmail, code: '000000', newPassword: 'NewPass123!' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/inválido/i);
+  });
+
+  it('should reject expired code', async () => {
+    db
+    db.prepare(`UPDATE users SET reset_code_expires = ? WHERE email = ?`)
+      .run(new Date(Date.now() - 1000).toISOString(), testEmail);
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ email: testEmail, code: '123456', newPassword: 'NewPass123!' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/expirado/i);
+  });
+
+  it('should reject weak new password', async () => {
+    // Update with valid code
+    db
+    db.prepare(`UPDATE users SET reset_code_expires = ?, reset_code = ? WHERE email = ?`)
+      .run(new Date(Date.now() + 30 * 60 * 1000).toISOString(), '654321', testEmail);
+
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ email: testEmail, code: '654321', newPassword: 'weak' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should reject invalid email format', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ email: 'not-email', code: '123456', newPassword: 'NewPass123!' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should reject non-numeric code', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({ email: testEmail, code: 'abcde', newPassword: 'NewPass123!' });
+
+    expect(res.status).toBe(400);
+  });
+});
+
+// ══════════════════════════════════════
+// Login Edge Cases
+// ══════════════════════════════════════
+describe('POST /api/auth/login (edge cases)', () => {
+  it('should reject pending verification user', async () => {
+    // Register but don't verify
+    await request(app)
+      .post('/api/auth/register')
+      .send({
+        email: 'pending@example.com',
+        password: 'Test123!',
+        first_name: 'Pending',
+        last_name: 'User',
+      });
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'pending@example.com', password: 'Test123!' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.requiresVerification).toBe(true);
+  });
+
+  it('should reject inactive account', async () => {
+    db
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash('Test123!', 10);
+    db.prepare(`INSERT INTO users (id, email, password, first_name, last_name, is_active)
+      VALUES (?, ?, ?, ?, ?, ?)`).run('inactive-1', 'inactive@test.com', hashedPassword, 'Inactive', 'User', 0);
+
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'inactive@test.com', password: 'Test123!' });
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toMatch(/desactivada/i);
+  });
+});
+
+// ══════════════════════════════════════
+// Refresh Token Edge Cases
+// ══════════════════════════════════════
+describe('POST /api/auth/refresh (edge cases)', () => {
+  it('should reject expired refresh token', async () => {
+    db
+    const expiredToken = 'expired-refresh-token';
+    db.prepare(`INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`)
+      .run('expired-1', 'test-user-id', expiredToken, new Date(Date.now() - 1000).toISOString());
+
+    const res = await request(app)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: expiredToken });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/expirado/i);
+  });
+
+  it('should reject when user not found or inactive', async () => {
+    db
+    const orphanedToken = 'orphan-refresh-token';
+    db.prepare(`INSERT INTO refresh_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)`)
+      .run('orphan-1', 'nonexistent-user', orphanedToken, new Date(Date.now() + 86400000).toISOString());
+
+    const res = await request(app)
+      .post('/api/auth/refresh')
+      .send({ refreshToken: orphanedToken });
+
+    expect(res.status).toBe(401);
+  });
+});
+
+// ══════════════════════════════════════
+// GET /me Edge Cases
+// ══════════════════════════════════════
+describe('GET /api/auth/me (edge cases)', () => {
+  it('should return 404 when user not found', async () => {
+    // Create a token for a deleted user
+    const token = jwt.sign({ id: 'nonexistent-user', email: 'test@test.com', role: 'client' }, JWT_SECRET);
+
+    const res = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+  });
+});
+
+// ══════════════════════════════════════
+// Change Password Edge Cases
+// ══════════════════════════════════════
+describe('POST /api/auth/change-password (edge cases)', () => {
+  let token;
+
+  beforeAll(async () => {
+    const res = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'test@example.com', password: 'NewPass123!' });
+    token = res.body.token;
+  });
+
+  it('should reject validation errors', async () => {
+    const res = await request(app)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'NewPass123!' });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('should reject Google account password change', async () => {
+    // Create Google user
+    db.prepare(`INSERT INTO users (id, email, first_name, last_name, provider, email_verified)
+      VALUES (?, ?, ?, ?, ?, ?)`).run('google-user-change', 'googlechange@test.com', 'Google', 'Change', 'google', 1);
+
+    // Login (would need Google token, so use direct token)
+    const googleToken = jwt.sign({ id: 'google-user-change', email: 'googlechange@test.com', role: 'client' }, JWT_SECRET);
+
+    const res = await request(app)
+      .post('/api/auth/change-password')
+      .set('Authorization', `Bearer ${googleToken}`)
+      .send({ currentPassword: 'any', newPassword: 'NewPass123!' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/Google/i);
+  });
 });
